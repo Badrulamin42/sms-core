@@ -1,0 +1,13 @@
+{
+ "compilerOptions": {
+    "target": "ES2020",                  // Specify ECMAScript target version
+    "module": "commonjs",               // Specify module code generation
+    "lib": ["ES2020"],                  // Specify library files to include
+    "strict": true,                     // Enable all strict type-checking options
+    "emitDecoratorMetadata": true,     // Emit design-type metadata for decorators
+    "experimentalDecorators": true,    // Enable experimental support for decorators
+    "skipLibCheck": true,              // Skip type checking of declaration files
+    "forceConsistentCasingInFileNames": true, // Ensure that casing is consistent in imports
+    "esModuleInterop": true, // Enable esModuleInterop
+  }
+}
