@@ -6,6 +6,7 @@ import * as jwt from 'jsonwebtoken';
 
 const authRouter = Router();
 const jwtoken: any = process?.env?.SKJWT
+
 authRouter.post('/register', async (req, res) => {
     const { email, password } = req.body;
     const userRepository = AppDataSource.getRepository(User);
