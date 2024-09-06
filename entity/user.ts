@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,6 +12,15 @@ export class User {
 
   @Column()
   password?: string ; // Provide a default value
+
+  @Column()
+  name?: string ; // Provide a default value
+
+  @Column()
+  isSuperUser?: boolean ; // Provide a default value
+
+  @CreateDateColumn({ type: 'timestamp' })
+  createdDate?: Date;
 
   async setPassword(password: string) {
     this.password = await bcrypt.hash(password, 10);

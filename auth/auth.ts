@@ -35,8 +35,10 @@ authRouter.post('/register', async (req, res) => {
       const token = jwt.sign({ userId: user.id }, jwtoken, {
         expiresIn: '1h',
       });
-  
-      res.json({ token });
+
+      delete user.password;
+    
+      res.json({ token, ...user });
     } catch (error) {
       res.status(500).json({ message: 'Error logging in', error });
     }
