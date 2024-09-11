@@ -8,16 +8,16 @@ export class User {
   id!: string ;
 
   @Column({ unique: true })
-  email?: string ; // Provide a default value
+  email!: string ; // Provide a default value
 
   @Column()
-  password?: string ; // Provide a default value
+  password!: string ; // Provide a default value
 
   @Column()
-  name?: string ; // Provide a default value
+  name!: string ; // Provide a default value
 
-  @Column()
-  isSuperUser?: boolean ; // Provide a default value
+  @Column({ type: 'boolean' })
+  isSuperUser!: boolean ; // Provide a default value
 
   @CreateDateColumn({ type: 'timestamp' })
   createdDate?: Date;
