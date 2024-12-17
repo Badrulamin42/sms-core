@@ -51,8 +51,8 @@ authRouter.post('/register', async (req, res) => {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
   
-      const token = jwt.sign({ userId: user.id }, jwtoken, {
-        expiresIn: '1h',
+      const token = jwt.sign({ userId: user.id, userName: user.name }, jwtoken, {
+        expiresIn: '24h',
       });
 
       delete user.password;
