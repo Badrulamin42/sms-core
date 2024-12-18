@@ -3,12 +3,13 @@ import { Router } from 'express';
 import { AppDataSource } from '../config/ormconfig';
 import { User } from '../entity/user';
 import * as jwt from 'jsonwebtoken';
+import { createLog } from "../middleware/Logging";
 
 const authRouter = Router();
 const jwtoken: any = process?.env?.SKJWT
 
 authRouter.post('/register', async (req, res) => {
-    const { email, password, name, isSuperUser } = req.body;
+    const { email, password, name, isSuperUser, actionBy } = req.body;
   const userRepository = AppDataSource.getRepository(User);
 
   // Input validation (basic example)
@@ -33,7 +34,7 @@ authRouter.post('/register', async (req, res) => {
     // Hash password before saving (assuming setPassword hashes the password)
     await user.setPassword(password);
     await userRepository.save(user);
-
+    await createLog("CREATE", "User", { email, name, isSuperUser }, actionBy);
     res.status(201).json({ message: 'User registered successfully', result: 'true' });
   } catch (error) {
     console.error('Error registering user:', error); // Log the error for debugging
