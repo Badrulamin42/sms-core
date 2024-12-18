@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,6 +21,9 @@ export class User {
 
   @CreateDateColumn({ type: 'timestamp' })
   createdDate?: Date;
+
+  @UpdateDateColumn({ type: 'timestamp', nullable: true })
+  lastActivity?: Date; // Automatically updated when entity is saved
 
   async setPassword(password: string) {
     this.password = await bcrypt.hash(password, 10);

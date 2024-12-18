@@ -8,13 +8,15 @@ import verifyToken from './middleware/authmiddleware';
 import { Server } from 'socket.io';
 import http from 'http';
 import * as jwt from 'jsonwebtoken';
+import userActivityUpdate from './middleware/userActitvyUpdate';
+import { User } from './entity/user';
 
 const app = express();
 const port = process.env.PORT;
 
 app.use(cors()); // Enable CORS
 app.use(express.json());
-const INACTIVITY_TIMEOUT = 30000; // 5 minutes timeout for inactivity
+const INACTIVITY_TIMEOUT = 300000; // 5min
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -64,18 +66,18 @@ socket.on("authenticate", (token) => {
 });
 
   // Handle forced logout for specific users
-  app.post("/force-logout", (req, res) => {
-    const { username } = req.body;
+  // app.post("/force-logout", (req, res) => {
+  //   const { username } = req.body;
 
-    if (connectedUsers[username]) {
-      const userSocketId = connectedUsers[username];
-      io.to(userSocketId).emit("logout", { message: "You have been logged out" });
-      delete connectedUsers[username];
-      res.json({ message: `${username} has been logged out` });
-    } else {
-      res.status(404).json({ message: "User not found or not connected" });
-    }
-  });
+  //   if (connectedUsers[username]) {
+  //     const userSocketId = connectedUsers[username];
+  //     io.to(userSocketId).emit("logout", { message: "You have been logged out" });
+  //     delete connectedUsers[username];
+  //     res.json({ message: `${username} has been logged out` });
+  //   } else {
+  //     res.status(404).json({ message: "User not found or not connected" });
+  //   }
+  // });
 
 // Handle user disconnection
 socket.on("disconnect", () => {
@@ -98,12 +100,18 @@ socket.on("disconnect", () => {
 });
 
 // Periodic check for inactivity (for automatic logout)
-setInterval(() => {
-  const now = Date.now();
+setInterval(async () => {
+
   for (const username in connectedUsers) {
     console.log(`User ${username} interval`);
     const user = connectedUsers[username];
-    if (now - user.lastActivity > INACTIVITY_TIMEOUT) {
+    const userRepository = AppDataSource.getRepository(User);
+        
+        // Use the 'where' clause to find the user by ID
+        const userobj:any =  await userRepository.findOne({ where: { id: username } });
+        const now = new Date().getTime(); // Current time in milliseconds
+        const lastActivityTime = new Date(userobj.lastActivity).getTime(); // Convert lastActivity to milliseconds
+    if (now - lastActivityTime > INACTIVITY_TIMEOUT) {
       // If the user is inactive for more than 5 minutes
    
       io.to(user.socketId).emit("logout", { message: "You have been logged out due to inactivity" });
@@ -111,7 +119,9 @@ setInterval(() => {
       console.log(`User ${username +' & '+ user.socketId} has been logged out due to inactivity`);
     }
   }
-}, 30000); // Check every minute
+}, 60000); // Check every minute
+
+
 
 AppDataSource.initialize()
   .then(() => {
@@ -121,7 +131,7 @@ AppDataSource.initialize()
     app.use('/auth', authRouter);
     // Protected route with JWT authentication
     app.use('/user', verifyToken, userlist);
-
+    app.use(userActivityUpdate)
     // Start the server
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);
