@@ -36,23 +36,38 @@ const verifyJWT = (token:any) => {
 let connectedUsers:any = {}; // Track connected users and their sockets
 io.on("connection", (socket) => {
   
-
 // Handle user authentication
 socket.on("authenticate", (token) => {
   try {
-    const decoded:any = verifyJWT(token);
+    const decoded:any = verifyJWT(token); // Verify the token (ensure `verifyJWT` is implemented correctly)
     console.log("User connected:", decoded);
 
-    // If decoded is valid (JWT is not expired and is properly signed)
     if (decoded) {
-      // Store the user's socket ID and last activity timestamp
-      connectedUsers[decoded.userId] = {
-        socketId: socket.id,
-        lastActivity: Date.now(),
-      };
- 
-    
-      console.log(`${decoded.userId} authenticated with socket ID: ${socket.id}, last activity at ${Date.now()}`);
+      // Ensure connectedUsers entry exists for the user
+      if (!connectedUsers[decoded.userId]) {
+        connectedUsers[decoded.userId] = [];
+      }
+
+      // Check if this socket ID already exists for the user
+      const isAlreadyConnected = connectedUsers[decoded.userId].some(
+        (connection:any) => connection.socketId === socket.id
+      );
+
+      if (!isAlreadyConnected) {
+        // Add the new connection (socket ID and activity timestamp) to the array
+        connectedUsers[decoded.userId].push({
+          socketId: socket.id,
+          lastActivity: Date.now(),
+        });
+
+        console.log(
+          `${decoded.userId} authenticated with socket ID: ${socket.id}, last activity at ${Date.now()}`
+        );
+      } else {
+        console.log(
+          `User ${decoded.userId} with socket ${socket.id} is already connected`
+        );
+      }
     } else {
       // If the token is invalid or expired, notify the user
       socket.emit("logout", { message: "Invalid or expired token" });
@@ -78,48 +93,73 @@ socket.on("authenticate", (token) => {
   //     res.status(404).json({ message: "User not found or not connected" });
   //   }
   // });
-
-// Handle user disconnection
-socket.on("disconnect", () => {
-  for (const userId in connectedUsers) {
-    if (connectedUsers[userId].socketId === socket.id) {
-      // If the socket ID matches, remove the user from the connected users list
-      delete connectedUsers[userId];
-      console.log(`User ${userId} disconnected`);
-      break;
-    }
-  }
-});
-
-    // Listen for specific user actions that reset inactivity timer
-    socket.on('user-action', (username) => {
-      if (connectedUsers[username]) {
-        connectedUsers[username].lastActivity = Date.now();
+  socket.on("user-action", (userId) => {
+    if (connectedUsers[userId]) {
+      // Find the specific connection for this socket ID and update its lastActivity
+      const connection = connectedUsers[userId].find((conn :any) => conn.socketId === socket.id);
+      if (connection) {
+        connection.lastActivity = Date.now();
+        console.log(`Activity updated for user ${userId}, socket ${socket.id}`);
       }
-    });
+    }
+  });
+
+  socket.on("disconnect", () => {
+    for (const userId in connectedUsers) {
+      // Find the user connection with the matching socket ID
+      connectedUsers[userId] = connectedUsers[userId].filter(
+        (conn:any) => conn.socketId !== socket.id
+      );
+
+      // If no connections remain for the user, delete the user entry
+      if (connectedUsers[userId].length === 0) {
+        delete connectedUsers[userId];
+        console.log(`User ${userId} disconnected completely`);
+      }
+    }
+  });
+
+  // Handle user actions that reset inactivity timer
+ 
 });
 
 // Periodic check for inactivity (for automatic logout)
 setInterval(async () => {
-
   for (const username in connectedUsers) {
     console.log(`User ${username} interval`);
-    const user = connectedUsers[username];
+    
+    const userConnections = connectedUsers[username]; // Array of connections
     const userRepository = AppDataSource.getRepository(User);
-        
-        // Use the 'where' clause to find the user by ID
-        const userobj:any =  await userRepository.findOne({ where: { id: username } });
-        const now = new Date().getTime(); // Current time in milliseconds
-        const lastActivityTime = new Date(userobj.lastActivity).getTime(); // Convert lastActivity to milliseconds
+
+    // Fetch user details from the database
+    const userobj:any = await userRepository.findOne({ where: { id: username } });
+    if (!userobj) {
+      console.log(`User ${username} not found in the database`);
+      continue;
+    }
+
+    const now = new Date().getTime(); // Current time in milliseconds
+    const lastActivityTime = new Date(userobj.lastActivity).getTime(); // Convert lastActivity to milliseconds
+
     if (now - lastActivityTime > INACTIVITY_TIMEOUT) {
-      // If the user is inactive for more than 5 minutes
-   
-      io.to(user.socketId).emit("logout", { message: "You have been logged out due to inactivity" });
+      // User has been inactive for more than the timeout threshold
+
+      userConnections.forEach((connection:any) => {
+        // Emit logout event to each socket
+        io.to(connection.socketId).emit("logout", {
+          message: "You have been logged out due to inactivity",
+        });
+        console.log(
+          `User ${username} with socket ${connection.socketId} has been logged out due to inactivity`
+        );
+      });
+
+      // Remove the user from connectedUsers
       delete connectedUsers[username];
-      console.log(`User ${username +' & '+ user.socketId} has been logged out due to inactivity`);
     }
   }
 }, 60000); // Check every minute
+
 
 
 
