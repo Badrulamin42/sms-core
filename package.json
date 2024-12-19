@@ -1,13 +1,20 @@
 {
   "dependencies": {
+    "@apollo/server": "^4.11.2",
+    "apollo-server-express": "^3.13.0",
     "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
+    "class-validator": "^0.14.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "express": "^4.21.2",
+    "graphql": "^16.10.0",
     "jsonwebtoken": "^9.0.2",
+    "mysql": "^2.18.1",
     "mysql2": "^3.11.0",
     "reflect-metadata": "^0.2.2",
     "socket.io": "^4.8.1",
+    "type-graphql": "^2.0.0-rc.2",
     "typeorm": "^0.3.20",
     "uuid": "^10.0.0"
   },

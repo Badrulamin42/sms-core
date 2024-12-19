@@ -1,17 +1,19 @@
 import 'reflect-metadata';
-import express, { Request, Response, Router } from 'express';
+import express, { Application, Request, Response, Router } from 'express';
 import { AppDataSource } from './config/ormconfig';
 import cors from 'cors';
 import authRouter from './auth/auth';
-import userlist from './user/userlist';
+import userRouter from './user/UserApi';
 import verifyToken from './middleware/authmiddleware';
 import { Server } from 'socket.io';
 import http from 'http';
 import * as jwt from 'jsonwebtoken';
 import userActivityUpdate from './middleware/userActitvyUpdate';
 import { User } from './entity/user';
+import { buildSchema } from 'type-graphql';
+import { ApolloServer } from 'apollo-server-express';
 
-const app = express();
+const app: Application = express();
 const port = process.env.PORT;
 
 app.use(cors()); // Enable CORS
@@ -24,6 +26,11 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   }
 });
+
+
+
+
+
 
 // Verify JWT middleware
 const verifyJWT = (token:any) => {
@@ -160,9 +167,6 @@ setInterval(async () => {
   }
 }, 60000); // Check every minute
 
-
-
-
 AppDataSource.initialize()
   .then(() => {
     console.log('Data Source has been initialized.');
@@ -170,7 +174,7 @@ AppDataSource.initialize()
     // Public routes
     app.use('/auth', authRouter);
     // Protected route with JWT authentication
-    app.use('/user', verifyToken, userlist);
+    app.use('/user', verifyToken, userRouter);
     app.use(userActivityUpdate)
     // Start the server
     server.listen(port, () => {
@@ -180,3 +184,4 @@ AppDataSource.initialize()
   .catch((error) => {
     console.error('Error during Data Source initialization:', error);
   });
+
