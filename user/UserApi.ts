@@ -69,6 +69,54 @@ const userRouter = Router();
   }
   });
 
+
+  //UPDATE user by ID
+  userRouter.put('/update', async (req, res) => {
+    try {
+      const { id, name, email, isSuperUser } = req.body;
+  
+      // Validate input
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID is required for updating user details',
+        });
+      }
+  
+      const userRepository = AppDataSource.getRepository(User);
+  
+      // Find the user to update
+      const user = await userRepository.findOneBy({ id });
+  
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+  
+      // Update user fields if provided
+      if (name) user.name = name;
+      if (email) user.email = email;
+      if (isSuperUser !== undefined) user.isSuperUser = isSuperUser;
+  
+      // Save the updated user
+      await userRepository.save(user);
+  
+      return res.status(200).json({
+        success: true,
+        message: 'User updated successfully',
+        data: user,
+      });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Database query error',
+      });
+    }
+  });
+
   //delete
 // DELETE user by ID
 userRouter.post('/delete', async (req, res) => {

@@ -34,7 +34,7 @@ app.use(
       console.log(`Blocked CORS request from: ${origin}`);
       return callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST"],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed methods
     credentials: true, // Allow cookies/auth headers
   })
 );
