@@ -16,10 +16,10 @@ const userRouter = Router();
       const userReq  = await userRepository.findOneBy({ id:userReqId });
 
       const users = await userRepository.find({
-        select: ['id', 'name', 'email', 'isSuperUser'], // List the fields you want to include
+        select: ['id', 'name', 'email', 'isSuperUser','createdDate'], // List the fields you want to include
       });
       const nonSuperusers = await userRepository.find({
-        select: ['id', 'name', 'email', 'isSuperUser'], // List the fields you want to include
+        select: ['id', 'name', 'email', 'isSuperUser','createdDate'], // List the fields you want to include
         where: {
           isSuperUser: false, 
         },

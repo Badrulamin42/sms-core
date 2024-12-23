@@ -10,27 +10,63 @@ import http from 'http';
 import * as jwt from 'jsonwebtoken';
 import userActivityUpdate from './middleware/userActitvyUpdate';
 import { User } from './entity/user';
-import { buildSchema } from 'type-graphql';
-import { ApolloServer } from 'apollo-server-express';
 
+
+
+const { exec } = require('child_process');
 const app: Application = express();
 const port = process.env.PORT;
 
-app.use(cors()); // Enable CORS
+const allowedOrigins:any = [
+  process.env.REACT_APP_HMS, 
+  "http://localhost:3000",
+  'http://myserver.local:3000'
+];
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      // If the origin is not in the list, block the request
+      console.log(`Blocked CORS request from: ${origin}`);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST"],
+    credentials: true, // Allow cookies/auth headers
+  })
+);
 app.use(express.json());
 const INACTIVITY_TIMEOUT = 300000; // 5min
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.REACT_APP_HMS, // Frontend URL for CORS
+    origin: allowedOrigins, // Frontend URL for CORS
     methods: ["GET", "POST"],
   }
 });
+// name = badrulaminz.aj@gmail.com
+// appid = 1000544868
+// pass = Myaminmg42
+const cameraRTSPUrl = 'rtsp://192.168.0.156:80/stream'; // Replace with your camera's RTSP URL
+app.get('/test-cors', (req, res) => {
+  res.send('CORS is working!');
+});
+// Route to serve the video stream
+app.get('/camera-feed', (req, res) => {
+    res.setHeader('Content-Type', 'video/mp4');
+    
+    // Use ffmpeg to convert the RTSP stream to a format suitable for the browser
+    const ffmpeg = exec(`ffmpeg -i ${cameraRTSPUrl} -vcodec libx264 -acodec aac -f mp4 -`);
+    
+    ffmpeg.stdout.pipe(res);
+    ffmpeg.stderr.on('data', (data:any) => console.error(`FFmpeg stderr: ${data}`));
+});
 
-
-
-
-
+// Serve static files (e.g., HTML file)
+app.use(express.static('public'));
 
 // Verify JWT middleware
 const verifyJWT = (token:any) => {
@@ -177,6 +213,7 @@ AppDataSource.initialize()
     app.use('/user', verifyToken, userRouter);
     app.use(userActivityUpdate)
     // Start the server
+ 
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);
     });
