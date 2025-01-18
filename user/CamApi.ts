@@ -7,6 +7,8 @@ const path = require("path");
 const faceapi = require("face-api.js");
 import { Canvas, Image, ImageData } from 'canvas';
 import { loadImage } from 'canvas';
+import sharp from "sharp";
+
 const camRouter = Router();
 
 // ESP32-CAM Stream URL and Credentials
@@ -26,7 +28,7 @@ if (!fs.existsSync(uploadDir)) {
 
 const upload = multer({
     dest: uploadDir,
-    limits: { fileSize: 10 * 1024 * 1024 }, // Set limit to 10MB
+    limits: { fileSize: 5 * 1024 * 1024 }, // Set limit to 10MB
 });
 camRouter.use(express.static("uploads")); // Serve uploaded images
 
@@ -58,14 +60,18 @@ camRouter.post("/register", upload.single("image"), async (req: any, res) => {
           .detectSingleFace(image)
           .withFaceLandmarks()
           .withFaceDescriptor();
+
+          const resizedResults = faceapi.resizeResults(detection, { width: 320, height: 240 });
+
   
-      if (!detection) {
-          return res.status(400).json({ error: "No face detected" });
-      }
+        // Check if a face was detected
+        if (resizedResults.length === 0) {
+            return res.status(400).json({ error: "No face detected" });
+        }
   
       const faceData = {
           userId: req.body.userId,
-          descriptor: Array.from(detection.descriptor), // Convert Float32Array to plain array
+          descriptor: Array.from(resizedResults.descriptor), // Convert Float32Array to plain array
       };
   
       const userFacesDir = `faces/${req.body.userId}`;
@@ -101,11 +107,17 @@ camRouter.post("/recognize", upload.single("image"), async (req: any, res) => {
         .withFaceLandmarks()
         .withFaceDescriptor();
 
-    if (!detection) {
-        return res.status(400).json({ error: "No face detected" });
-    }
+        const resizedResults = faceapi.resizeResults(detection, { width: 320, height: 240 });
+        
+  
+        // Check if a face was detected
+        if (resizedResults.length === 0) {
+            return res.status(400).json({ error: "No face detected" });
 
-    const descriptor = detection.descriptor;
+        }
+
+        
+    const descriptor = resizedResults.descriptor;
     const userId = req.body.userId; // The userId should be passed in the request body
 
     // Read all face files for the user
@@ -117,7 +129,7 @@ camRouter.post("/recognize", upload.single("image"), async (req: any, res) => {
     const registeredFaces = fs.readdirSync(userFacesDir).map((file: string) =>
       JSON.parse(fs.readFileSync(path.join(userFacesDir, file), 'utf-8'))
     );
-
+  
     let bestMatch = null;
     let smallestDistance = Infinity;
 
@@ -140,6 +152,70 @@ camRouter.post("/recognize", upload.single("image"), async (req: any, res) => {
     res.status(500).json({ error: "Face recognition failed" });
   }
 });
+
+camRouter.post('/recognize/espcam',  upload.single("image"), async (req :any, res :any) => {
+    try {
+
+      console.log('Received Esp32 Image');
+
+      const imagePath = req.file.path;
+ 
+        const filePath = path.join(__dirname, 'uploads', `image_${Date.now()}.jpg`);
+
+        // Ensure the 'uploads' directory exists
+        if (!fs.existsSync(path.dirname(filePath))) {
+            fs.mkdirSync(path.dirname(filePath));
+        }
+
+        // Write the buffer to a file
+        fs.renameSync(imagePath, filePath);
+      
+
+        const image = await loadImage(imagePath);
+      // Detect faces
+      const detection = await faceapi
+      .detectSingleFace(image)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+      const resizedResults = faceapi.resizeResults(detection, { width: 320, height: 240 });
+      if (resizedResults.length === 0) {
+        console.log("No faces detected");
+        return res.status(400).json({ error: "No faces detected" });
+      }
+      const descriptor = resizedResults.descriptor;
+      let bestMatch = null;
+      let smallestDistance = Infinity;
+          // Read all face files for the user
+    const userFacesDir = `faces/${'Badrul'}`;
+    if (!fs.existsSync(userFacesDir)) {
+      return res.status(400).json({ error: "User not found" });
+    }
+
+    const registeredFaces = fs.readdirSync(userFacesDir).map((file: string) =>
+        JSON.parse(fs.readFileSync(path.join(userFacesDir, file), 'utf-8'))
+      );
+
+      registeredFaces.forEach((face: { descriptor: any; userId: any; }) => {
+        const distance = faceapi.euclideanDistance(descriptor, face.descriptor);
+        if (distance < smallestDistance && distance < 0.6) { // 0.6 is a typical threshold
+            smallestDistance = distance;
+            bestMatch = face.userId;
+        }
+      });
+  
+      // You can add code to compare face descriptors or register faces here
+      if (bestMatch) {
+        console.log("faces matched");
+    } else {
+        console.log("No faces matched");
+    }
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Face recognition failed' });
+    }
+  });
 
 export default camRouter;
 
