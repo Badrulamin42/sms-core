@@ -8,9 +8,10 @@ const faceapi = require("face-api.js");
 import { Canvas, Image, ImageData } from 'canvas';
 import { loadImage } from 'canvas';
 import sharp from "sharp";
+import {TelegramBotService} from '../telegram/cam_notification';
 
 const camRouter = Router();
-
+const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6VdUOtfphI');
 // ESP32-CAM Stream URL and Credentials
 const espStreamUrl = 'http://192.168.0.7/stream';
 const espAuth = {
@@ -160,23 +161,18 @@ camRouter.post('/recognize/espcam',  upload.single("image"), async (req :any, re
 
       const imagePath = req.file.path;
  
-        const filePath = path.join(__dirname, 'uploads', `image_${Date.now()}.jpg`);
-
-        // Ensure the 'uploads' directory exists
-        if (!fs.existsSync(path.dirname(filePath))) {
-            fs.mkdirSync(path.dirname(filePath));
-        }
-
-        // Write the buffer to a file
-        fs.renameSync(imagePath, filePath);
       
-
         const image = await loadImage(imagePath);
       // Detect faces
       const detection = await faceapi
       .detectSingleFace(image)
       .withFaceLandmarks()
       .withFaceDescriptor();
+
+      if (!detection) {
+        console.log("Image not detect");
+        return res.status(400).json({ error: "Image not detect" });
+      }
 
       const resizedResults = faceapi.resizeResults(detection, { width: 320, height: 240 });
       if (resizedResults.length === 0) {
@@ -206,8 +202,20 @@ camRouter.post('/recognize/espcam',  upload.single("image"), async (req :any, re
   
       // You can add code to compare face descriptors or register faces here
       if (bestMatch) {
+        const filePath = path.join(__dirname, 'uploads', `image_${Date.now()}.jpg`);
+
+        const uploadDir = path.dirname(filePath);
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true }); // create all directories in the path if needed
+        }
+        
+        // Move the file
+        fs.renameSync(imagePath, filePath);
+        botService.sendMessageToUser('1293926065', 'Badrul detected!');
         console.log("faces matched");
+
     } else {
+      botService.sendMessageToUser('1293926065', 'Stranger detected!');
         console.log("No faces matched");
     }
 
