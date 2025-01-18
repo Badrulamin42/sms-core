@@ -199,24 +199,36 @@ camRouter.post('/recognize/espcam',  upload.single("image"), async (req :any, re
             bestMatch = face.userId;
         }
       });
+
+      const filePath = path.join(__dirname, 'uploads/recognized', `image_${Date.now()}.jpg`);
+      const filePathStranger = path.join(__dirname, 'uploads/stranger', `image_${Date.now()}.jpg`);
+
+      const uploadDir = path.dirname(filePath);
+      const uploadDirStranger = path.dirname(filePathStranger);
+      if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true }); // create all directories in the path if needed
+      }
+      if (!fs.existsSync(uploadDirStranger)) {
+        fs.mkdirSync(uploadDirStranger, { recursive: true }); // create all directories in the path if needed
+    }
+
   
       // You can add code to compare face descriptors or register faces here
       if (bestMatch) {
-        const filePath = path.join(__dirname, 'uploads', `image_${Date.now()}.jpg`);
-
-        const uploadDir = path.dirname(filePath);
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true }); // create all directories in the path if needed
-        }
-        
-        // Move the file
+        // Move the file to the 'recognized' folder
         fs.renameSync(imagePath, filePath);
-        botService.sendMessageToUser('1293926065', 'Badrul detected!');
-        console.log("faces matched");
-
+    
+        // Send the image to Telegram bot with the correct file path string
+        botService.sendMessageWithImage('1293926065', 'Badrul detected!', filePath);
+        console.log("Face matched");
+    
     } else {
-      botService.sendMessageToUser('1293926065', 'Stranger detected!');
-        console.log("No faces matched");
+        // Move the file to the 'stranger' folder
+        fs.renameSync(imagePath, filePathStranger);
+    
+        // Send the image to Telegram bot with the correct file path string
+        botService.sendMessageWithImage('1293926065', 'Stranger detected!', filePathStranger);
+        console.log("No face matched");
     }
 
     } catch (err) {
