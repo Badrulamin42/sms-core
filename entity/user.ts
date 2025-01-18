@@ -10,6 +10,9 @@ export class User {
   @Column({ unique: true })
   email!: string ; // Provide a default value
 
+  @Column({ unique: true, nullable: true  })
+  telegramUsername!: string ; // Provide a default value
+
   @Column()
   password!: string ; // Provide a default value
 
@@ -21,6 +24,9 @@ export class User {
 
   @CreateDateColumn({ type: 'timestamp' })
   createdDate?: Date;
+
+  @Column({ unique: true, nullable: true })
+  phoneNumber?: string; // Add phone number field
 
   @UpdateDateColumn({ type: 'timestamp', nullable: true })
   lastActivity?: Date; // Automatically updated when entity is saved

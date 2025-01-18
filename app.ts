@@ -10,12 +10,25 @@ import http from 'http';
 import * as jwt from 'jsonwebtoken';
 import userActivityUpdate from './middleware/userActitvyUpdate';
 import { User } from './entity/user';
-
-
-
+const axios = require('axios');
+import { createProxyMiddleware } from 'http-proxy-middleware';  // Correct import for newer versions
+const fs = require('fs');
+const ipcam01 = '192.168.0.7'
+const ESP32_CAM_STREAM_URL = `http://192.168.0.7/stream`;
 const { exec } = require('child_process');
 const app: Application = express();
 const port = process.env.PORT;
+const ffmpeg = require('fluent-ffmpeg');
+// Set body parser limits
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+import camRouter from './user/CamApi';
+
+
+
+// Create a proxy server
+
 
 const allowedOrigins:any = [
   process.env.REACT_APP_HMS, 
@@ -41,32 +54,20 @@ app.use(
 app.use(express.json());
 const INACTIVITY_TIMEOUT = 300000; // 5min
 const server = http.createServer(app);
+// Set max headers size (in bytes, default is 8KB)
+server.maxHeadersCount = 1000; // Maximum number of headers to allow
+server.maxRequestsPerSocket = 100;
+
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins, // Frontend URL for CORS
+    origin: "*",
+    // origin: allowedOrigins, // Frontend URL for CORS
     methods: ["GET", "POST"],
   }
 });
-// name = badrulaminz.aj@gmail.com
-// appid = 1000544868
-// pass = Myaminmg42
-const cameraRTSPUrl = 'rtsp://192.168.0.156:80/stream'; // Replace with your camera's RTSP URL
-app.get('/test-cors', (req, res) => {
-  res.send('CORS is working!');
-});
-// Route to serve the video stream
-app.get('/camera-feed', (req, res) => {
-    res.setHeader('Content-Type', 'video/mp4');
-    
-    // Use ffmpeg to convert the RTSP stream to a format suitable for the browser
-    const ffmpeg = exec(`ffmpeg -i ${cameraRTSPUrl} -vcodec libx264 -acodec aac -f mp4 -`);
-    
-    ffmpeg.stdout.pipe(res);
-    ffmpeg.stderr.on('data', (data:any) => console.error(`FFmpeg stderr: ${data}`));
-});
 
-// Serve static files (e.g., HTML file)
-app.use(express.static('public'));
+(server as any).maxHeaderSize = 16 * 1024; // Set to 16 KB (default is 8 KB)
+server.setTimeout(60000); // Set the timeout to 60 seconds
 
 // Verify JWT middleware
 const verifyJWT = (token:any) => {
@@ -103,6 +104,8 @@ socket.on("authenticate", (token) => {
           lastActivity: Date.now(),
         });
 
+    
+
         console.log(
           `${decoded.userId} authenticated with socket ID: ${socket.id}, last activity at ${Date.now()}`
         );
@@ -111,6 +114,8 @@ socket.on("authenticate", (token) => {
           `User ${decoded.userId} with socket ${socket.id} is already connected`
         );
       }
+
+   
     } else {
       // If the token is invalid or expired, notify the user
       socket.emit("logout", { message: "Invalid or expired token" });
@@ -203,6 +208,8 @@ setInterval(async () => {
   }
 }, 60000); // Check every minute
 
+
+
 AppDataSource.initialize()
   .then(() => {
     console.log('Data Source has been initialized.');
@@ -212,8 +219,9 @@ AppDataSource.initialize()
     // Protected route with JWT authentication
     app.use('/user', verifyToken, userRouter);
     app.use(userActivityUpdate)
-    // Start the server
- 
+    app.use('/cam', camRouter);
+    
+  
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);
     });
