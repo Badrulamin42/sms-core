@@ -4,10 +4,14 @@ import { AppDataSource } from '../config/ormconfig';
 import { User } from '../entity/user';
 import { createLog } from "../middleware/Logging";
 import { Resolver, Query, Mutation, Arg } from 'type-graphql';
-
+import {TelegramBotService} from '../telegram/cam_notification';
+import { TempOtp } from '../entity/tempotp';
 const userRouter = Router();
 
-
+function generateRandomSixDigit(): string {
+  return (100000 + Math.random() * 900000).toFixed(0);
+}
+const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6VdUOtfphI');
  // Define route to fetch users
  userRouter.get('/list', async (req, res) => {
     try {
@@ -36,7 +40,7 @@ const userRouter = Router();
   //create
 
   userRouter.post('/register', async (req, res) => {
-    const { email, password, name, isSuperUser, actionBy } = req.body;
+    const { email, password, name, isSuperUser, actionBy, telegram, chatId} = req.body;
   const userRepository = AppDataSource.getRepository(User);
 
   // Input validation (basic example)
@@ -48,7 +52,11 @@ const userRouter = Router();
     // Check if user already exists
     const existingUser = await userRepository.findOneBy({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists', result: 'failed' });
+      return res.status(400).json({ message: 'User already exists : email', result: 'failed' });
+    }
+    const existingUsertel = await userRepository.findOneBy({ telegramUsername : telegram });
+    if (existingUsertel) {
+      return res.status(400).json({ message: 'User already exists : telegram', result: 'failed' });
     }
 
     // Create new user
@@ -56,13 +64,96 @@ const userRouter = Router();
     user.email = email;
     user.name = name;
     user.isSuperUser = isSuperUser;
+    user.telegramUsername = telegram;
+    user.chatID = chatId
 
 
     // Hash password before saving (assuming setPassword hashes the password)
     await user.setPassword(password);
     await userRepository.save(user);
-    await createLog("CREATE", "User", { email, name, isSuperUser }, actionBy);
+    await createLog("CREATE", "User", { email, name, isSuperUser, telegram }, actionBy);
     res.status(201).json({ message: 'User registered successfully', result: 'true' });
+  } catch (error) {
+    console.error('Error registering user:', error); // Log the error for debugging
+    res.status(500).json({ message: 'Error registering user', result: 'failed' });
+  }
+  });
+
+//telegram otp
+  userRouter.post('/register/otp', async (req, res) => {
+    const { telegram, actionBy } = req.body;
+  const userRepository = AppDataSource.getRepository(User);
+
+  // Input validation (basic example)
+  if (!telegram) {
+    return res.status(400).json({ message: 'Email, password, and name are required', result: 'failed' });
+  }
+  const timestamp = Date.now();
+  let OTP = generateRandomSixDigit()
+
+
+  try {
+    // Check if user already exists
+
+    const tempOtpRepository = AppDataSource.getRepository(TempOtp);
+    const existingUsertel = await userRepository.findOneBy({ telegramUsername : telegram });
+    if (existingUsertel) {
+      return res.status(400).json({ message: 'User already exists : telegram', result: 'failed' });
+    }
+
+
+       await botService.getUpdates();
+      
+ 
+
+    const chatId = botService.getChatIdByUsername(telegram); // Custom method in TelegramBotService
+
+    if (!chatId) {
+        return res.status(404).json({ message: `Chat ID for username ${telegram} not found or user not verified.`, result: 'failed' });
+    }
+    
+    // Step 2: Send OTP to the user via Telegram
+    botService.sendMessageOTP(chatId, `Your OTP is: ${OTP}`);
+   tempOtpRepository.save({ Telegramusername :telegram, otp:OTP, generatedAt: timestamp });
+
+    res.status(200).json({ message: 'sent OTP successfully', result: 'true', chatId });
+  } catch (error) {
+    console.error('Error registering user:', error); // Log the error for debugging
+    res.status(500).json({ message: 'Error registering user', result: 'failed' });
+  }
+  });
+
+  //telegram otp
+  userRouter.post('/register/verifyotp', async (req, res) => {
+    const { otpcode, actionBy, telegram } = req.body;
+  const userRepository = AppDataSource.getRepository(User);
+  const tempOtpRepository = AppDataSource.getRepository(TempOtp);
+
+
+  try {
+    // Check if user already exists
+
+    const tempOtp = await tempOtpRepository.findOne({ where: { Telegramusername:telegram } });
+
+    if (!tempOtp) {
+      return res.status(404).json({ message: 'No OTP found for this email or phone', result: 'failed' });
+    }
+
+   // Check if the OTP matches
+   if (tempOtp.otp !== otpcode) {
+    return res.status(400).json({ message: 'Invalid OTP', result: 'failed' });
+  }
+
+  // Check if the OTP is expired (e.g., 5 minutes)
+  const otpExpiryTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+  if (Date.now() - tempOtp.generatedAt > otpExpiryTime) {
+    return res.status(400).json({ message: 'OTP expired', result: 'failed' });
+  }
+
+  res.status(200).json({ message: 'OTP verified successfully', result: 'true' });
+
+  // Optionally, delete the OTP after successful verification
+  await tempOtpRepository.delete(tempOtp.id);
   } catch (error) {
     console.error('Error registering user:', error); // Log the error for debugging
     res.status(500).json({ message: 'Error registering user', result: 'failed' });

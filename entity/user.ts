@@ -19,6 +19,9 @@ export class User {
   @Column()
   name!: string ; // Provide a default value
 
+  @Column()
+  code!: string;
+
   @Column({ unique: true, nullable: true })
   chatID!: string ; // Provide a default value
 
