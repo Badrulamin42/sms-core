@@ -230,3 +230,4 @@ AppDataSource.initialize()
     console.error('Error during Data Source initialization:', error);
   });
 
+  export { io };

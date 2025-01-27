@@ -9,8 +9,12 @@ import { Canvas, Image, ImageData } from 'canvas';
 import { loadImage } from 'canvas';
 import sharp from "sharp";
 import { TelegramBotService } from '../telegram/cam_notification';
-
+import { Server } from 'http';
+const http = require('http');
+import { io } from '../app';  // Import the io instance from app.ts
 const camRouter = Router();
+const server = http.createServer(camRouter);
+
 const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6VdUOtfphI');
 // ESP32-CAM Stream URL and Credentials
 const espStreamUrl = 'http://192.168.0.7/stream';
@@ -94,6 +98,107 @@ camRouter.post("/register", upload.single("image"), async (req: any, res) => {
     res.status(500).json({ error: "Face registration failed" });
   }
 });
+
+
+
+
+const streamFrames = async () => {
+  try {
+    const response = await fetch(espStreamUrl);
+
+    if (!response.body) {
+      console.log('No body in response');
+      return;
+    }
+
+    const reader = response.body.getReader();
+    let frameBuffer = Buffer.alloc(0);  // Initialize an empty buffer
+    const boundary = '--123456789000000000000987654321';  // Adjust based on your stream's boundary
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        console.log('Stream ended');
+        break;
+      }
+
+      // Append the new chunk to the frame buffer
+      frameBuffer = Buffer.concat([frameBuffer, value]);
+
+      // Check if we can find the boundary
+      let boundaryIndex = frameBuffer.indexOf(boundary);
+
+      // If the boundary exists, process the frame
+      while (boundaryIndex !== -1) {
+        // Locate the end of the frame headers
+        const frameHeaderEnd = frameBuffer.indexOf('\r\n\r\n') + 4;
+        const frameData = frameBuffer.slice(frameHeaderEnd, boundaryIndex);  // Extract frame data without headers
+
+        // Reset the buffer for the next frame
+        frameBuffer = frameBuffer.slice(boundaryIndex + boundary.length);
+
+        // Convert frame data to base64
+        const base64Image = `data:image/jpeg;base64,${frameData.toString('base64')}`;
+        io.emit('frame', base64Image);
+
+        try {
+          // Convert the frame data to a buffer and check JPEG magic bytes
+          const imageBuffer = Buffer.from(frameData);
+          console.log('First 20 bytes of imageBuffer:', imageBuffer.slice(0, 20));
+
+          if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
+            // Resize the image with sharp
+            // const processedImage = await sharp(imageBuffer)
+              // .resize(224, 224)
+              // .toBuffer();
+
+            // Use face-api.js to detect faces
+            // const image =  loadImage(processedImage);  // Convert to canvas image
+            // const detections =  faceapi.detectAllFaces(image).withFaceLandmarks().withFaceDescriptors();
+
+            // Emit face recognition data
+            // const faceLandmarks = detections.map((detection:any) => detection.landmarks);
+            // io.emit('face-recognition', { detections, landmarks: faceLandmarks });
+          } else {
+            console.error('Invalid image format detected');
+          }
+        } catch (err) {
+          console.error('Error processing frame with sharp:', err);
+        }
+
+        // Look for the next boundary
+        boundaryIndex = frameBuffer.indexOf(boundary);
+      }
+    }
+  } catch (error) {
+    console.error('Error in streamFrames:', error);
+  }
+};
+
+
+camRouter.get('/start-stream', async (req, res) => {
+  try {
+    // Start the streaming process
+    streamFrames();  // This will begin the streaming process
+    res.status(200).send("Streaming started...");
+  } catch (err) {
+    console.error('Error starting stream:', err);
+    res.status(500).send("Failed to start streaming.");
+  }
+});
+
+
+// // Handle WebSocket connections
+// io.on('connection', (socket) => {
+//   console.log('Client connected');
+
+//   // Handle disconnection
+//   socket.on('disconnect', () => {
+//     console.log('Client disconnected');
+//   });
+// });
+
 
 // Recognize a face
 // Recognize route for face recognition (compare with all faces of the user)
@@ -242,6 +347,8 @@ camRouter.post('/recognize/espcam', upload.single("image"), async (req: any, res
     console.error(err);
     res.status(500).json({ error: 'Face recognition failed' });
   }
+
+
 });
 
 export default camRouter;
