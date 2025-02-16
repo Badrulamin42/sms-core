@@ -14,7 +14,7 @@ const http = require('http');
 import { io } from '../app';  // Import the io instance from app.ts
 const camRouter = Router();
 const server = http.createServer(camRouter);
-
+const clientTracker = require('./clientTracker'); 
 const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6VdUOtfphI');
 // ESP32-CAM Stream URL and Credentials
 const espStreamUrl = 'http://192.168.0.7/stream';
@@ -117,7 +117,7 @@ const streamFrames = async () => {
 
     while (true) {
       const { done, value } = await reader.read();
-
+   
       if (done) {
         console.log('Stream ended');
         break;
@@ -140,7 +140,9 @@ const streamFrames = async () => {
 
         // Convert frame data to base64
         const base64Image = `data:image/jpeg;base64,${frameData.toString('base64')}`;
-        io.emit('frame', base64Image);
+       
+          io.emit('frame', base64Image);
+    
 
         try {
           // Convert the frame data to a buffer and check JPEG magic bytes

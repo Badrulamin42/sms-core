@@ -22,7 +22,7 @@ const ffmpeg = require('fluent-ffmpeg');
 // Set body parser limits
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
+const clientTracker = require('./user/ClientTracker');  // Import the client tracker module
 import camRouter from './user/CamApi';
 
 
@@ -83,6 +83,8 @@ io.on("connection", (socket) => {
 // Handle user authentication
 socket.on("authenticate", (token) => {
   try {
+    
+
     const decoded:any = verifyJWT(token); // Verify the token (ensure `verifyJWT` is implemented correctly)
     console.log("User connected:", decoded);
 
@@ -98,6 +100,7 @@ socket.on("authenticate", (token) => {
       );
 
       if (!isAlreadyConnected) {
+        clientTracker.increment();  // Increment activeClients
         // Add the new connection (socket ID and activity timestamp) to the array
         connectedUsers[decoded.userId].push({
           socketId: socket.id,
@@ -105,7 +108,7 @@ socket.on("authenticate", (token) => {
         });
 
     
-
+          
         console.log(
           `${decoded.userId} authenticated with socket ID: ${socket.id}, last activity at ${Date.now()}`
         );
@@ -161,6 +164,7 @@ socket.on("authenticate", (token) => {
 
       // If no connections remain for the user, delete the user entry
       if (connectedUsers[userId].length === 0) {
+        clientTracker.decrement();  // Decrement activeClients
         delete connectedUsers[userId];
         console.log(`User ${userId} disconnected completely`);
       }
@@ -174,7 +178,7 @@ socket.on("authenticate", (token) => {
 // Periodic check for inactivity (for automatic logout)
 setInterval(async () => {
   for (const username in connectedUsers) {
-    console.log(`User ${username} interval`);
+    console.log(`User ${username} interval ${clientTracker.getActiveClients()}`);
     
     const userConnections = connectedUsers[username]; // Array of connections
     const userRepository = AppDataSource.getRepository(User);
@@ -230,4 +234,7 @@ AppDataSource.initialize()
     console.error('Error during Data Source initialization:', error);
   });
 
-  export { io };
+  export { 
+    io,
+   
+  };
