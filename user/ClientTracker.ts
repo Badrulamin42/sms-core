@@ -12,6 +12,6 @@ module.exports = {
     activeClients++; console.log('active clients : ',activeClients)
  },
   decrement: () => {
-    activeClients = activeClients <= 0 ? 0 :activeClients--;
+  activeClients-- ; console.log('active clients : ',activeClients)
  }
 };

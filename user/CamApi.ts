@@ -100,95 +100,98 @@ camRouter.post("/register", upload.single("image"), async (req: any, res) => {
 });
 
 
+function euclideanDistance(arr1: Float32Array, arr2: Float32Array): number {
+  return Math.sqrt(arr1.reduce((sum, val, i) => sum + (val - arr2[i]) ** 2, 0));
+}
 
 
-const streamFrames = async () => {
-  try {
-    const response = await fetch(espStreamUrl);
+// const streamFrames = async () => {
+//   try {
+//     const response = await fetch(espStreamUrl);
 
-    if (!response.body) {
-      console.log('No body in response');
-      return;
-    }
+//     if (!response.body) {
+//       console.log('No body in response');
+//       return;
+//     }
 
-    const reader = response.body.getReader();
-    let frameBuffer = Buffer.alloc(0);  // Initialize an empty buffer
-    const boundary = '--123456789000000000000987654321';  // Adjust based on your stream's boundary
+//     const reader = response.body.getReader();
+//     let frameBuffer = Buffer.alloc(0);  // Initialize an empty buffer
+//     const boundary = '--123456789000000000000987654321';  // Adjust based on your stream's boundary
 
-    while (true) {
-      const { done, value } = await reader.read();
+//     while (true) {
+//       const { done, value } = await reader.read();
    
-      if (done) {
-        console.log('Stream ended');
-        break;
-      }
+//       if (done) {
+//         console.log('Stream ended');
+//         break;
+//       }
 
-      // Append the new chunk to the frame buffer
-      frameBuffer = Buffer.concat([frameBuffer, value]);
+//       // Append the new chunk to the frame buffer
+//       frameBuffer = Buffer.concat([frameBuffer, value]);
 
-      // Check if we can find the boundary
-      let boundaryIndex = frameBuffer.indexOf(boundary);
+//       // Check if we can find the boundary
+//       let boundaryIndex = frameBuffer.indexOf(boundary);
 
-      // If the boundary exists, process the frame
-      while (boundaryIndex !== -1) {
-        // Locate the end of the frame headers
-        const frameHeaderEnd = frameBuffer.indexOf('\r\n\r\n') + 4;
-        const frameData = frameBuffer.slice(frameHeaderEnd, boundaryIndex);  // Extract frame data without headers
+//       // If the boundary exists, process the frame
+//       while (boundaryIndex !== -1) {
+//         // Locate the end of the frame headers
+//         const frameHeaderEnd = frameBuffer.indexOf('\r\n\r\n') + 4;
+//         const frameData = frameBuffer.slice(frameHeaderEnd, boundaryIndex);  // Extract frame data without headers
 
-        // Reset the buffer for the next frame
-        frameBuffer = frameBuffer.slice(boundaryIndex + boundary.length);
+//         // Reset the buffer for the next frame
+//         frameBuffer = frameBuffer.slice(boundaryIndex + boundary.length);
 
-        // Convert frame data to base64
-        const base64Image = `data:image/jpeg;base64,${frameData.toString('base64')}`;
+//         // Convert frame data to base64
+//         const base64Image = `data:image/jpeg;base64,${frameData.toString('base64')}`;
        
-          io.emit('frame', base64Image);
+//           io.emit('frame', base64Image);
     
 
-        try {
-          // Convert the frame data to a buffer and check JPEG magic bytes
-          const imageBuffer = Buffer.from(frameData);
-          console.log('First 20 bytes of imageBuffer:', imageBuffer.slice(0, 20));
+//         try {
+//           // Convert the frame data to a buffer and check JPEG magic bytes
+//           const imageBuffer = Buffer.from(frameData);
+//           console.log('First 20 bytes of imageBuffer:', imageBuffer.slice(0, 20));
 
-          if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
-            // Resize the image with sharp
-            // const processedImage = await sharp(imageBuffer)
-              // .resize(224, 224)
-              // .toBuffer();
+//           if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
+//             // Resize the image with sharp
+//             // const processedImage = await sharp(imageBuffer)
+//               // .resize(224, 224)
+//               // .toBuffer();
 
-            // Use face-api.js to detect faces
-            // const image =  loadImage(processedImage);  // Convert to canvas image
-            // const detections =  faceapi.detectAllFaces(image).withFaceLandmarks().withFaceDescriptors();
+//             // Use face-api.js to detect faces
+//             // const image =  loadImage(processedImage);  // Convert to canvas image
+//             // const detections =  faceapi.detectAllFaces(image).withFaceLandmarks().withFaceDescriptors();
 
-            // Emit face recognition data
-            // const faceLandmarks = detections.map((detection:any) => detection.landmarks);
-            // io.emit('face-recognition', { detections, landmarks: faceLandmarks });
-          } else {
-            console.error('Invalid image format detected');
-          }
-        } catch (err) {
-          console.error('Error processing frame with sharp:', err);
-        }
+//             // Emit face recognition data
+//             // const faceLandmarks = detections.map((detection:any) => detection.landmarks);
+//             // io.emit('face-recognition', { detections, landmarks: faceLandmarks });
+//           } else {
+//             console.error('Invalid image format detected');
+//           }
+//         } catch (err) {
+//           console.error('Error processing frame with sharp:', err);
+//         }
 
-        // Look for the next boundary
-        boundaryIndex = frameBuffer.indexOf(boundary);
-      }
-    }
-  } catch (error) {
-    console.error('Error in streamFrames:', error);
-  }
-};
+//         // Look for the next boundary
+//         boundaryIndex = frameBuffer.indexOf(boundary);
+//       }
+//     }
+//   } catch (error) {
+//     console.error('Error in streamFrames:', error);
+//   }
+// };
 
 
-camRouter.get('/start-stream', async (req, res) => {
-  try {
-    // Start the streaming process
-    streamFrames();  // This will begin the streaming process
-    res.status(200).send("Streaming started...");
-  } catch (err) {
-    console.error('Error starting stream:', err);
-    res.status(500).send("Failed to start streaming.");
-  }
-});
+// camRouter.get('/start-stream', async (req, res) => {
+//   try {
+//     // Start the streaming process
+//     streamFrames();  // This will begin the streaming process
+//     res.status(200).send("Streaming started...");
+//   } catch (err) {
+//     console.error('Error starting stream:', err);
+//     res.status(500).send("Failed to start streaming.");
+//   }
+// });
 
 
 // // Handle WebSocket connections
@@ -204,6 +207,81 @@ camRouter.get('/start-stream', async (req, res) => {
 
 // Recognize a face
 // Recognize route for face recognition (compare with all faces of the user)
+
+// Compare Descriptors
+camRouter.post("/recognize-face", async (req, res) => {
+  try {
+    const { descriptor} = req.body;
+
+    if (!descriptor) {
+      return res.status(400).json({ error: "Missing descriptor or userId" });
+    }
+
+    const inputDescriptor = new Float32Array(JSON.parse(descriptor));
+    console.log(`Received descriptor length: ${inputDescriptor.length}`);
+
+
+    // Read stored face descriptors
+    // const registeredFaces = fs.readdirSync(userFacesDir).map((file : any) => {
+    //   const faceData = JSON.parse(fs.readFileSync(path.join(userFacesDir, file), "utf-8"));
+    //   return { descriptor: Array.from(faceData.descriptor), userId: faceData.userId };
+    // });
+
+    let bestMatch = null;
+    let smallestDistance = Infinity;
+    const threshold = 0.6; // Lower threshold = stricter matching
+
+    const facesDir = 'faces'; // Directory containing user folders
+    const userFolders = fs.readdirSync(facesDir).filter((file: string) => fs.statSync(path.join(facesDir, file)).isDirectory()); // Get all directories in 'faces'
+    let matchedFolder = ""; // To store the name of the matched folder
+    // Compare with stored descriptors
+    for (const userFolder of userFolders) {
+      const userFacesDir = path.join(facesDir, userFolder);
+
+      if (!fs.existsSync(userFacesDir)) {
+        return res.status(400).json({ error: `User folder '${userFolder}' not found` });
+      }
+
+
+      const registeredFaces = fs.readdirSync(userFacesDir).map((file: string) =>
+        JSON.parse(fs.readFileSync(path.join(userFacesDir, file), 'utf-8'))
+      );
+
+      // Compare descriptors for each registered face in the folder
+      registeredFaces.forEach((face: { descriptor: any; userId: any; }) => {
+        console.log(`Comparing with stored descriptor length: ${face.descriptor.length}`);
+      
+        // Ensure both descriptors have the same length before comparing
+        if (inputDescriptor.length !== face.descriptor.length) {
+          console.warn(`Skipping descriptor with mismatched length: ${face.descriptor.length}`);
+         
+        }
+
+        const distance = faceapi.euclideanDistance(inputDescriptor, face.descriptor);
+        if (distance < smallestDistance && distance < 0.9) { // 0.6 is a typical threshold
+          smallestDistance = distance;
+          bestMatch = face.userId;
+          matchedFolder = userFolder; // Store the folder name of the matched user
+        }
+      });
+
+      // const distance = faceapi.euclideanDistance(inputDescriptor, face.descriptor);
+    
+
+      // if (distance < smallestDistance && distance < threshold) {
+      //   smallestDistance = distance;
+      //   bestMatch = face.userId;
+      // }
+    }
+
+    return res.json({ match: !!bestMatch, userId: bestMatch });
+
+  } catch (error) {
+    console.error("Error processing face recognition:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 camRouter.post("/recognize", upload.single("image"), async (req: any, res) => {
   try {
     const imagePath = req.file.path;
