@@ -7,6 +7,7 @@ import userRouter from './user/UserApi';
 import verifyToken from './middleware/authmiddleware';
 import { Server } from 'socket.io';
 import http from 'http';
+import https from 'https';
 import * as jwt from 'jsonwebtoken';
 import userActivityUpdate from './middleware/userActitvyUpdate';
 import { User } from './entity/user';
@@ -28,13 +29,18 @@ import camRouter from './user/CamApi';
 
 
 // Create a proxy server
-
-
+const options = {
+  key: fs.readFileSync('cert/privkey.pem'),
+  cert: fs.readFileSync('cert/fullchain.pem'),
+};
+// SSL_CERT=cert/rootCA.pem
+// SSL_KEY=cert/rootCA-key.pem
 const allowedOrigins:any = [
   process.env.REACT_APP_HMS, 
   "http://localhost:3000",
   'http://myserver.local:3000'
 ];
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -53,7 +59,7 @@ app.use(
 );
 app.use(express.json());
 const INACTIVITY_TIMEOUT = 300000; // 5min
-const server = http.createServer(app);
+const server = https.createServer(options,app);
 // Set max headers size (in bytes, default is 8KB)
 server.maxHeadersCount = 1000; // Maximum number of headers to allow
 server.maxRequestsPerSocket = 100;
