@@ -25,6 +25,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const clientTracker = require('./user/ClientTracker');  // Import the client tracker module
 import camRouter from './user/CamApi';
+import NotificationRouter from './notification/notificationApi';
 
 
 
@@ -38,23 +39,41 @@ const options = {
 const allowedOrigins:any = [
   process.env.REACT_APP_HMS, 
   "http://localhost:3000",
-  'http://myserver.local:3000'
+  'http://myserver.local:3000',
+  'https//centoc.io',
 ];
 
+// app.use(
+//   cors({
+//     origin: (origin, callback) => {
+//       // Allow requests with no origin (like mobile apps or Postman)
+//       if (!origin) return callback(null, true);
+//       if (allowedOrigins.includes(origin)) {
+//         return callback(null, true);
+//       }
+//       // If the origin is not in the list, block the request
+//       console.log(`Blocked CORS request from: ${origin}`);
+//       return callback(new Error("Not allowed by CORS"));
+//     },
+//     methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed methods
+//     credentials: true, // Allow cookies/auth headers
+//   })
+// );
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
+      console.log("Incoming request from:", origin); // Debugging log
+
+      // ✅ Allow requests with no origin (Postman, mobile apps)
+      if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      // If the origin is not in the list, block the request
-      console.log(`Blocked CORS request from: ${origin}`);
+
+      console.log(`🚫 Blocked CORS request from: ${origin}`);
       return callback(new Error("Not allowed by CORS"));
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed methods
-    credentials: true, // Allow cookies/auth headers
+    methods: ["GET", "POST", "PUT", "DELETE"], // Allowed HTTP methods
+    credentials: true // Allow cookies/auth headers
   })
 );
 app.use(express.json());
@@ -225,11 +244,12 @@ AppDataSource.initialize()
     console.log('Data Source has been initialized.');
 
     // Public routes
-    app.use('/auth', authRouter);
+    app.use('/api/auth', authRouter);
+    app.use('/api/notification', NotificationRouter);
     // Protected route with JWT authentication
-    app.use('/user', verifyToken, userRouter);
+    app.use('/api/user', verifyToken, userRouter);
     app.use(userActivityUpdate)
-    app.use('/cam', camRouter);
+    app.use('/api/cam', camRouter);
     
   
     server.listen(port, () => {

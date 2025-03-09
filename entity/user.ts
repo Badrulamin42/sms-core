@@ -22,6 +22,9 @@ export class User {
   @Column()
   code!: string;
 
+  @Column({nullable: true })
+  fcmtoken!: string;
+
   @Column({ unique: true, nullable: true })
   chatID!: string ; // Provide a default value
 
