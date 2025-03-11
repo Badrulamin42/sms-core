@@ -6,7 +6,7 @@ import { createLog } from "../middleware/Logging";
 import { Resolver, Query, Mutation, Arg } from 'type-graphql';
 import {TelegramBotService} from '../telegram/cam_notification';
 import { TempOtp } from '../entity/tempotp';
-const { sendPushNotification } = require("./notificationController");
+const { sendPushNotification,sendPushNotificationToAll } = require("./notificationController");
 
 const NotificationRouter = Router();
 
@@ -58,5 +58,16 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
     res.json(result);
   });
   
+
+  NotificationRouter.post("/send-notification-all", async (req, res) => {
+    const {title, body } = req.body;
+  
+    if (!title || !body) {
+      return res.status(400).json({ error: "Missing parameters" });
+    }
+  
+    const result = await sendPushNotificationToAll(title, body);
+    res.json(result);
+  });
   
   export default NotificationRouter;
