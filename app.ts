@@ -168,6 +168,30 @@ io.on("connection", (socket: any) => {
     }
   });
   
+
+  socket.on("disconnect", () => {
+    console.log(`Socket disconnected: ${socket.id}`);
+  
+    let userIdToRemove = null;
+    
+    // Find the user owning the socket
+    for (const userId of Object.keys(connectedUsers)) {
+      connectedUsers[userId] = connectedUsers[userId].filter(({ socketId }) => socketId !== socket.id);
+      if (connectedUsers[userId].length === 0) {
+        userIdToRemove = userId;
+      }
+    }
+  
+    // Only decrement if no active sockets exist for the user
+    if (userIdToRemove && clientTracker.getActiveClients() > 0) {
+      delete connectedUsers[userIdToRemove];
+      clientTracker.decrement();
+    }
+  
+    console.log(`Active clients after disconnect: ${clientTracker.getActiveClients()}`);
+  });
+  
+
   socket.on("sendMessage", ({ senderId, receiverId, text } :any) => {
    
     const receiverSocketId = onlineUsers.get(receiverId)?.socketId; // Find receiver's socket ID
@@ -180,26 +204,6 @@ io.on("connection", (socket: any) => {
     } else {
       console.log("Receiver is offline.");
     }
-  });
-  socket.on("disconnect", () => {
-    console.log(`Socket disconnected: ${socket.id}`);
-  
-    // Find which user this socket belongs to
-    let userIdToRemove = null;
-    Object.keys(connectedUsers).forEach(userId => {
-      connectedUsers[userId] = connectedUsers[userId].filter(({ socketId }) => socketId !== socket.id);
-      if (connectedUsers[userId].length === 0) {
-        userIdToRemove = userId;
-      }
-    });
-  
-    // **Only decrement if no active sockets remain for this user**
-    if (userIdToRemove) {
-      delete connectedUsers[userIdToRemove];
-      clientTracker.decrement();
-    }
-  
-    console.log(`Active clients after disconnect: ${clientTracker.getActiveClients()}`);
   });
 });
 
