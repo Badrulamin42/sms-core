@@ -11,8 +11,12 @@ import https from 'https';
 import * as jwt from 'jsonwebtoken';
 import userActivityUpdate from './middleware/userActitvyUpdate';
 import { User } from './entity/user';
+import camRouter from './user/CamApi';
+import NotificationRouter from './notification/notificationApi';
+
+
+
 const axios = require('axios');
-import { createProxyMiddleware } from 'http-proxy-middleware';  // Correct import for newer versions
 const fs = require('fs');
 const ipcam01 = '192.168.0.7'
 const ESP32_CAM_STREAM_URL = `http://192.168.0.7/stream`;
@@ -24,11 +28,15 @@ const ffmpeg = require('fluent-ffmpeg');
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const clientTracker = require('./user/ClientTracker');  // Import the client tracker module
-import camRouter from './user/CamApi';
-import NotificationRouter from './notification/notificationApi';
 
 
 
+interface UserConnection {
+  socketId: string;
+  lastActivity: number;
+}
+
+const connectedUsers: Record<string, UserConnection[]> = {};
 // Create a proxy server
 const options = {
   key: fs.readFileSync('cert/privkey.pem'),
@@ -78,12 +86,13 @@ app.use(
 );
 app.use(express.json());
 const INACTIVITY_TIMEOUT = 300000; // 5min
-const server = https.createServer(options,app);
+// const server = https.createServer(options,app);
+const server = http.createServer(app);
 // Set max headers size (in bytes, default is 8KB)
 server.maxHeadersCount = 1000; // Maximum number of headers to allow
 server.maxRequestsPerSocket = 100;
 
-const io = new Server(server, {
+const io : any = new Server(server, {
   cors: {
     origin: "*",
     // origin: allowedOrigins, // Frontend URL for CORS
@@ -102,103 +111,101 @@ const verifyJWT = (token:any) => {
     return null;
   }
 };
-let connectedUsers:any = {}; // Track connected users and their sockets
-io.on("connection", (socket) => {
+const onlineUsers = new Map();
+
+io.on("connection", (socket: any) => {
+  console.log(`New socket connection: ${socket.id}`);
+
+  socket.on("authenticate", (token: any) => {
+    try {
+      const decoded: any = verifyJWT(token);
+      console.log("User connected:", decoded);
   
-// Handle user authentication
-socket.on("authenticate", (token) => {
-  try {
-    
-
-    const decoded:any = verifyJWT(token); // Verify the token (ensure `verifyJWT` is implemented correctly)
-    console.log("User connected:", decoded);
-
-    if (decoded) {
-      // Ensure connectedUsers entry exists for the user
-      if (!connectedUsers[decoded.userId]) {
-        connectedUsers[decoded.userId] = [];
+      if (!decoded || !decoded.userId) {
+        socket.emit("logout", { message: "Invalid or expired token" });
+        return;
       }
+      
 
-      // Check if this socket ID already exists for the user
-      const isAlreadyConnected = connectedUsers[decoded.userId].some(
-        (connection:any) => connection.socketId === socket.id
-      );
+      const userId = decoded.userId;
+      const wasUserAlreadyConnected = connectedUsers[userId]?.length > 0;
+     
+       socket.userId = userId; // Attach userId to socket
+      // **Disconnect all previous sockets for this user before assigning a new one**
 
-      if (!isAlreadyConnected) {
-        clientTracker.increment();  // Increment activeClients
-        // Add the new connection (socket ID and activity timestamp) to the array
-        connectedUsers[decoded.userId].push({
-          socketId: socket.id,
-          lastActivity: Date.now(),
-        });
-
-    
-          
-        console.log(
-          `${decoded.userId} authenticated with socket ID: ${socket.id}, last activity at ${Date.now()}`
-        );
-      } else {
-        console.log(
-          `User ${decoded.userId} with socket ${socket.id} is already connected`
-        );
-      }
-
-   
-    } else {
-      // If the token is invalid or expired, notify the user
-      socket.emit("logout", { message: "Invalid or expired token" });
-      console.log("Invalid or expired token received.");
-    }
-  } catch (error) {
-    // If the token verification fails, handle the error
-    console.error("Token verification failed:", error);
-    socket.emit("logout", { message: "Invalid token" });
-  }
-});
-
-  // Handle forced logout for specific users
-  // app.post("/force-logout", (req, res) => {
-  //   const { username } = req.body;
-
-  //   if (connectedUsers[username]) {
-  //     const userSocketId = connectedUsers[username];
-  //     io.to(userSocketId).emit("logout", { message: "You have been logged out" });
-  //     delete connectedUsers[username];
-  //     res.json({ message: `${username} has been logged out` });
-  //   } else {
-  //     res.status(404).json({ message: "User not found or not connected" });
-  //   }
-  // });
-  socket.on("user-action", (userId) => {
-    if (connectedUsers[userId]) {
-      // Find the specific connection for this socket ID and update its lastActivity
-      const connection = connectedUsers[userId].find((conn :any) => conn.socketId === socket.id);
-      if (connection) {
-        connection.lastActivity = Date.now();
-        console.log(`Activity updated for user ${userId}, socket ${socket.id}`);
-      }
-    }
-  });
-
-  socket.on("disconnect", () => {
-    for (const userId in connectedUsers) {
-      // Find the user connection with the matching socket ID
-      connectedUsers[userId] = connectedUsers[userId].filter(
-        (conn:any) => conn.socketId !== socket.id
-      );
-
-      // If no connections remain for the user, delete the user entry
-      if (connectedUsers[userId].length === 0) {
-        clientTracker.decrement();  // Decrement activeClients
-        delete connectedUsers[userId];
-        console.log(`User ${userId} disconnected completely`);
-      }
-    }
-  });
-
-  // Handle user actions that reset inactivity timer
+       // Store the user's socket ID
+       onlineUsers.set(userId, { socketId: socket.id, username: decoded.userName }); // Assuming username exists
+       console.log(`${userId} is online: ${decoded.userName}`);
  
+       // Send the updated user list to all clients
+       io.emit("onlineUsers", Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username })));
+
+      if (connectedUsers[userId]) {
+        connectedUsers[userId].forEach(({ socketId }) => {
+          if (io.sockets.sockets.get(socketId)) {
+            io.sockets.sockets.get(socketId).disconnect(true);
+          }
+        });
+      }
+  
+      // **Reset connections before adding a new one**
+      connectedUsers[userId] = [{ socketId: socket.id, lastActivity: Date.now() }];
+  
+      // **Only increment active clients if this is a fresh login**
+      if (!wasUserAlreadyConnected) {
+        clientTracker.increment();
+      }
+  
+      console.log(
+        `${userId} authenticated with socket ID: ${socket.id}, last activity at ${Date.now()}, active clients: ${clientTracker.getActiveClients()}`
+      );
+  
+      socket.emit("authenticated", { message: "Authentication successful" });
+  
+    } catch (error) {
+      console.error("Token verification failed:", error);
+      socket.emit("logout", { message: "Invalid token" });
+    }
+  });
+  
+  socket.on("sendMessage", ({ senderId, receiverId, text } :any) => {
+   
+    const receiverSocketId = onlineUsers.get(receiverId)?.socketId; // Find receiver's socket ID
+    
+    console.log('senderId :',senderId)
+    console.log('receiverId :',receiverId)
+    console.log('receiverSocketId :',receiverSocketId)
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("receiveMessage", { senderId, text });
+    } else {
+      console.log("Receiver is offline.");
+    }
+  });
+  socket.on("disconnect", () => {
+    console.log(`Socket disconnected: ${socket.id}`);
+  
+    // Find which user this socket belongs to
+    let userIdToRemove = null;
+    Object.keys(connectedUsers).forEach(userId => {
+      connectedUsers[userId] = connectedUsers[userId].filter(({ socketId }) => socketId !== socket.id);
+      if (connectedUsers[userId].length === 0) {
+        userIdToRemove = userId;
+      }
+    });
+  
+    // **Only decrement if no active sockets remain for this user**
+    if (userIdToRemove) {
+      delete connectedUsers[userIdToRemove];
+      clientTracker.decrement();
+    }
+  
+    console.log(`Active clients after disconnect: ${clientTracker.getActiveClients()}`);
+  });
 });
+
+
+
+
 
 // Periodic check for inactivity (for automatic logout)
 setInterval(async () => {

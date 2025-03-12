@@ -4,7 +4,7 @@ console.log('active clients : ',activeClients)
 // Export as an object so the reference remains consistent
 module.exports = {
   getActiveClients: () => {
-    console.log('active clients : ',activeClients);
+   
    return activeClients 
 } ,
   increment: () => {
