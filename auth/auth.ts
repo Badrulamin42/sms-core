@@ -1,7 +1,7 @@
 // src/routes/auth.ts
 import { Router } from 'express';
 import { AppDataSource } from '../config/ormconfig';
-import { User } from '../entity/user';
+import { User } from '../entity/User/user';
 import * as jwt from 'jsonwebtoken';
 import { createLog } from "../middleware/Logging";
 

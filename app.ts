@@ -10,9 +10,10 @@ import http from 'http';
 import https from 'https';
 import * as jwt from 'jsonwebtoken';
 import userActivityUpdate from './middleware/userActitvyUpdate';
-import { User } from './entity/user';
+import { User } from './entity/User/user';
 import camRouter from './user/CamApi';
 import NotificationRouter from './notification/notificationApi';
+import refferalRouter from './Refferal/refferalApi';
 
 
 
@@ -136,10 +137,14 @@ io.on("connection", (socket: any) => {
        // Store the user's socket ID
        onlineUsers.set(userId, { socketId: socket.id, username: decoded.userName }); // Assuming username exists
        console.log(`${userId} is online: ${decoded.userName}`);
- 
+       console.log("Emitting updated users list:", Array.from(onlineUsers.values()));
        // Send the updated user list to all clients
        io.emit("onlineUsers", Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username })));
-
+ // Also send the list **only to the newly connected user**
+    socket.emit("onlineUsers", Array.from(onlineUsers, ([id, data]) => ({
+      userId: id,
+      username: data.username,
+    })));
       if (connectedUsers[userId]) {
         connectedUsers[userId].forEach(({ socketId }) => {
           if (io.sockets.sockets.get(socketId)) {
@@ -168,28 +173,61 @@ io.on("connection", (socket: any) => {
     }
   });
   
-
+  socket.on("forceLogout", () => {
+    console.log(`User ${socket.userId} is logging out.`);
+    
+    if (socket.userId && onlineUsers.has(socket.userId)) {
+      const userSocketId = onlineUsers.get(socket.userId).socketId; // Get the socket ID
+      io.to(userSocketId).emit("logout", {
+        message: "You have been logged out due to inactivity",
+      });
+      console.log(`Removing user ${socket.userId} immediately due to logout`);
+      delete connectedUsers[socket.userId];
+      onlineUsers.delete(socket.userId);
+      clientTracker.decrement();
+      console.log(" updated users list:", Array.from(onlineUsers.values()));
+      io.emit(
+        "onlineUsers",
+        Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username }))
+      );
+    }
+    
+    socket.disconnect(true); // Ensure full disconnection
+  });
   socket.on("disconnect", () => {
     console.log(`Socket disconnected: ${socket.id}`);
-  
-    let userIdToRemove = null;
     
-    // Find the user owning the socket
-    for (const userId of Object.keys(connectedUsers)) {
+    if (!socket.userId) return; // Ensure there's a valid userId
+    
+    const userId = socket.userId;
+    const socketWasRemoved = connectedUsers[userId]?.some(({ socketId }) => socketId === socket.id);
+    
+    if (socketWasRemoved) {
       connectedUsers[userId] = connectedUsers[userId].filter(({ socketId }) => socketId !== socket.id);
-      if (connectedUsers[userId].length === 0) {
-        userIdToRemove = userId;
-      }
     }
-  
-    // Only decrement if no active sockets exist for the user
-    if (userIdToRemove && clientTracker.getActiveClients() > 0) {
-      delete connectedUsers[userIdToRemove];
-      clientTracker.decrement();
+    
+    if (connectedUsers[userId]?.length === 0) {
+      console.log(`User ${userId} disconnected, waiting for reconnection...`);
+      
+      setTimeout(() => {
+        if (!connectedUsers[userId] || connectedUsers[userId].length === 0) {
+          console.log(`Removing user ${userId} from onlineUsers after timeout`);
+          delete connectedUsers[userId];
+          onlineUsers.delete(userId);
+          clientTracker.decrement();
+    
+          io.emit(
+            "onlineUsers",
+            Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username }))
+          );
+        }
+      }, 3000); // Wait 5 seconds before fully removing
     }
-  
+    
     console.log(`Active clients after disconnect: ${clientTracker.getActiveClients()}`);
   });
+  
+
   
 
   socket.on("sendMessage", ({ senderId, receiverId, text } :any) => {
@@ -256,6 +294,7 @@ AppDataSource.initialize()
 
     // Public routes
     app.use('/api/auth', authRouter);
+    app.use('/api/refferal', refferalRouter);
     app.use('/api/notification', NotificationRouter);
     // Protected route with JWT authentication
     app.use('/api/user', verifyToken, userRouter);

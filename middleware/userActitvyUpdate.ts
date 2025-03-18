@@ -1,6 +1,6 @@
 import express, { Router } from 'express';
 import { AppDataSource } from '../config/ormconfig';
-import { User } from '../entity/user'; // Adjust the path to your User entity
+import { User } from '../entity/User/user'; // Adjust the path to your User entity
 
 const userActivityUpdate = Router();
 

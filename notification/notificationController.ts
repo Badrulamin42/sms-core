@@ -1,6 +1,6 @@
 import { Not } from 'typeorm';
 import { AppDataSource } from '../config/ormconfig';
-import { User } from '../entity/user';
+import { User } from '../entity/User/user';
 
 const admin = require("firebase-admin");
 

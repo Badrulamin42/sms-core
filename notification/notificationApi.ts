@@ -1,7 +1,7 @@
 // src/routes/auth.ts
 import { Router } from 'express';
 import { AppDataSource } from '../config/ormconfig';
-import { User } from '../entity/user';
+import { User } from '../entity/User/user';
 import { createLog } from "../middleware/Logging";
 import { Resolver, Query, Mutation, Arg } from 'type-graphql';
 import {TelegramBotService} from '../telegram/cam_notification';

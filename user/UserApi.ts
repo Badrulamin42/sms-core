@@ -1,11 +1,13 @@
 // src/routes/auth.ts
 import { Router } from 'express';
 import { AppDataSource } from '../config/ormconfig';
-import { User } from '../entity/user';
+import { User } from '../entity/User/user';
 import { createLog } from "../middleware/Logging";
 import { Resolver, Query, Mutation, Arg } from 'type-graphql';
 import {TelegramBotService} from '../telegram/cam_notification';
 import { TempOtp } from '../entity/tempotp';
+import { Referral } from '../entity/Referral/Refferal';
+import multer from 'multer';
 const userRouter = Router();
 
 function generateRandomSixDigit(): string {
@@ -38,11 +40,15 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
   });
 
   //create
+  const storage = multer.memoryStorage();
+  const upload = multer({ storage });
 
-  userRouter.post('/register', async (req, res) => {
-    const { email, password, name, isSuperUser, actionBy, telegram, chatId} = req.body;
+  userRouter.post('/register',upload.single("image"), async (req, res) => {
+    const { email, password, name, isSuperUser, actionBy, telegram, chatId, ref} = req.body;
+    const image = req.file ? req.file.buffer : null; // Store image as binary
+    
   const userRepository = AppDataSource.getRepository(User);
-
+  const referrerRepository = AppDataSource.getRepository(Referral);
   // Input validation (basic example)
   if (!email || !password || !name) {
     return res.status(400).json({ message: 'Email, password, and name are required', result: 'failed' });
@@ -66,11 +72,30 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
     user.isSuperUser = isSuperUser;
     user.telegramUsername = telegram;
     user.chatID = chatId
+    user.image = image ? image : undefined;
 
+
+    
 
     // Hash password before saving (assuming setPassword hashes the password)
     await user.setPassword(password);
-    await userRepository.save(user);
+    const savedUser = await userRepository.save(user);
+
+    if (ref) {
+      const referrer = await userRepository.findOne({ where: { id: ref } }); // Ensure correct query
+    
+      if (referrer) {
+        const referral = referrerRepository.create({
+          affiliate: referrer,
+          referredUserId: savedUser.id,
+          status: "pending",
+          commission: 0.0, // Example commission
+        });
+    
+        await referrerRepository.save(referral); // Use save() via repository
+      }
+    }
+
     await createLog("CREATE", "User", { email, name, isSuperUser, telegram }, actionBy);
     res.status(201).json({ message: 'User registered successfully', result: 'true' });
   } catch (error) {

@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { Referral } from '../Referral/Refferal';
 
 @Entity()
 export class User {
@@ -39,6 +40,19 @@ export class User {
 
   @UpdateDateColumn({ type: 'timestamp', nullable: true })
   lastActivity?: Date; // Automatically updated when entity is saved
+
+  @Column({ nullable: true })
+  referralCode?: string;
+
+  @Column({ nullable: true })
+  referredBy?: string; // ID of referrer
+
+   // Column to store image as binary data
+   @Column("longblob", { nullable: true })
+   image?: Buffer;
+
+  @OneToMany(() => Referral, (referral) => referral.affiliate)
+  referrals?: Referral[];
 
   async setPassword(password: string) {
     this.password = await bcrypt.hash(password, 10);
