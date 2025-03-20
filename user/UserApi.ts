@@ -8,11 +8,32 @@ import {TelegramBotService} from '../telegram/cam_notification';
 import { TempOtp } from '../entity/tempotp';
 import { Referral } from '../entity/Referral/Refferal';
 import multer from 'multer';
+const { nanoid } = require('nanoid');
 const userRouter = Router();
 
 function generateRandomSixDigit(): string {
   return (100000 + Math.random() * 900000).toFixed(0);
 }
+
+async function generateUniqueReferralCode(name: string): Promise<string> {
+ 
+  let referralCode;
+  let isUnique = false;
+
+  do {
+    const prefix = name.replace(/\s+/g, "").substring(0, 4).toUpperCase();
+    const randomPart = nanoid(5).toUpperCase();
+    referralCode = `${prefix}${randomPart}`;
+
+    const existingUser = await AppDataSource.getRepository(User).findOne({ where: { referralCode } });
+    if (!existingUser) {
+      isUnique = true;
+    }
+  } while (!isUnique);
+
+  return referralCode;
+}
+
 const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6VdUOtfphI');
  // Define route to fetch users
  userRouter.get('/list', async (req, res) => {
@@ -22,7 +43,7 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
       const userReq  = await userRepository.findOneBy({ id:userReqId });
 
       const users = await userRepository.find({
-        select: ['id', 'name', 'email', 'isSuperUser','createdDate'], // List the fields you want to include
+        select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'createdDate'], // List the fields you want to include
       });
       const nonSuperusers = await userRepository.find({
         select: ['id', 'name', 'email', 'isSuperUser','createdDate'], // List the fields you want to include
@@ -44,7 +65,7 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
   const upload = multer({ storage });
 
   userRouter.post('/register',upload.single("image"), async (req, res) => {
-    const { email, password, name, isSuperUser, actionBy, telegram, chatId, ref} = req.body;
+    const { email, password, name, isSuperUser, actionBy, telegram, chatId, ref, phoneNumber} = req.body;
     const image = req.file ? req.file.buffer : null; // Store image as binary
     
   const userRepository = AppDataSource.getRepository(User);
@@ -60,21 +81,22 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists : email', result: 'failed' });
     }
-    const existingUsertel = await userRepository.findOneBy({ telegramUsername : telegram });
-    if (existingUsertel) {
-      return res.status(400).json({ message: 'User already exists : telegram', result: 'failed' });
-    }
-
+    // const existingUsertel = await userRepository.findOneBy({ telegramUsername : telegram });
+    // if (existingUsertel) {
+    //   return res.status(400).json({ message: 'User already exists : telegram', result: 'failed' });
+    // }
+ 
     // Create new user
     const user = new User();
     user.email = email;
     user.name = name;
     user.isSuperUser = isSuperUser;
-    user.telegramUsername = telegram;
-    user.chatID = chatId
+    user.phoneNumber = phoneNumber
+    user.telegramUsername = telegram === "" ? null : telegram;
+    user.chatID = chatId === "" ? null : chatId
     user.image = image ? image : undefined;
-
-
+    user.referralCode = await generateUniqueReferralCode(name); // Or use user.id if available
+ 
     
 
     // Hash password before saving (assuming setPassword hashes the password)
@@ -82,7 +104,7 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
     const savedUser = await userRepository.save(user);
 
     if (ref) {
-      const referrer = await userRepository.findOne({ where: { id: ref } }); // Ensure correct query
+      const referrer = await userRepository.findOne({ where: { referralCode: ref } }); // Ensure correct query
     
       if (referrer) {
         const referral = referrerRepository.create({
