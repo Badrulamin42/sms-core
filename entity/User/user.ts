@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { Referral } from '../Referral/Refferal';
+import { Role } from './roles';
 
 @Entity()
 export class User {
@@ -53,6 +54,10 @@ export class User {
 
   @OneToMany(() => Referral, (referral) => referral.affiliate)
   referrals?: Referral[];
+
+  @ManyToMany(() => Role, (role) => role.users, { cascade: true })
+  @JoinTable() // Required for Many-to-Many relations!
+  roles?: Role[];
 
   async setPassword(password: string) {
     this.password = await bcrypt.hash(password, 10);

@@ -11,7 +11,6 @@ import sharp from "sharp";
 import { TelegramBotService } from '../telegram/cam_notification';
 import { Server } from 'http';
 const http = require('http');
-import { io } from '../app';  // Import the io instance from app.ts
 const camRouter = Router();
 const server = http.createServer(camRouter);
 const clientTracker = require('./clientTracker'); 
