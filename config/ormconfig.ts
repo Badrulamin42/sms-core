@@ -4,6 +4,7 @@ import { Referral } from '../entity/Referral/Refferal';
 import { Log } from '../entity/log';
 import { TempOtp } from '../entity/tempotp';
 import { Role } from '../entity/User/roles';
+import { Message } from '../entity/chat';
 require('dotenv').config();
 
 export const AppDataSource = new DataSource({
@@ -13,6 +14,6 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  entities: [User,Log,TempOtp,Referral, Role],
+  entities: [User,Log,TempOtp,Referral, Role, Message],
   synchronize: true,
 });

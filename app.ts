@@ -15,6 +15,7 @@ import camRouter from './user/CamApi';
 import NotificationRouter from './notification/notificationApi';
 import refferalRouter from './Refferal/refferalApi';
 import { app, port, server } from './socket';
+import msgrouter from './chat/chatAPI';
 
 
 // Set body parser limits
@@ -35,7 +36,7 @@ AppDataSource.initialize()
     app.use('/api/user', verifyToken, userRouter);
     app.use(userActivityUpdate)
     app.use('/api/cam', camRouter);
-    
+    app.use('/api/msg', msgrouter);
   
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);

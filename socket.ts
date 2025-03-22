@@ -14,6 +14,8 @@ import { User } from './entity/User/user';
 import camRouter from './user/CamApi';
 import NotificationRouter from './notification/notificationApi';
 import refferalRouter from './Refferal/refferalApi';
+import { In } from 'typeorm';
+import { Message } from './entity/chat';
 const clientTracker = require('./user/ClientTracker');  // Import the client tracker module
 const fs = require('fs');
 const INACTIVITY_TIMEOUT = 300000; // 5min
@@ -34,7 +36,7 @@ interface UserConnection {
   lastActivity: number;
 }
 
-const connectedUsers: Record<string, UserConnection[]> = {};
+
 // Create a proxy server
 const options = {
   key: fs.readFileSync('cert/privkey.pem'),
@@ -97,8 +99,13 @@ io.on("connection", (socket: any) => {
       }
       socket.userId = decoded.userId; 
       const userId = decoded.userId;
-      onlineUsers.set(userId, { socketId: socket.id, username: decoded.userName });
-  
+      const existingUser = onlineUsers.get(userId);
+      if (existingUser) {
+        existingUser.socketIds.push(socket.id);
+      } else {
+        onlineUsers.set(userId, { socketIds: [socket.id], username: decoded.userName });
+      }
+
       console.log(`${userId} is online: ${decoded.userName}`);
       
       // Send updated user list to all clients
@@ -126,20 +133,18 @@ io.on("connection", (socket: any) => {
       onlineUsers.delete(socket.userId);
     }
   
-    delete connectedUsers[socket.userId];
-  
     console.log("Updated users list:", Array.from(onlineUsers.values()));
     io.emit("onlineUsers", Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username })));
   
     socket.disconnect(true); // Ensure full disconnection
   });
+
   socket.on("disconnect", () => {
     console.log(`Socket disconnected: ${socket.id}`);
     console.log(`Socket disconnected: ${socket.userId}`);
     if (!socket.userId) return;
     const userId = socket.userId;
   
-    delete connectedUsers[userId];
     onlineUsers.delete(userId);
   
     io.emit("onlineUsers", Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username })));
@@ -153,56 +158,80 @@ io.on("connection", (socket: any) => {
     })));
   });
 
-  socket.on("sendMessage", ({ senderId, receiverId, text } :any) => {
-   
-    const receiverSocketId = onlineUsers.get(receiverId)?.socketId; // Find receiver's socket ID
-    
-    console.log('senderId :',senderId)
-    console.log('receiverId :',receiverId)
-    console.log('receiverSocketId :',receiverSocketId)
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("receiveMessage", { senderId, text });
-    } else {
-      console.log("Receiver is offline.");
-    }
+socket.on("sendMessage", async ({ senderId, receiverId, text }: any) => {
+  const messageRepository = AppDataSource.getRepository(Message);
+  const newMessage = messageRepository.create({
+    sender_id: senderId,
+    receiver_id: receiverId,
+    text,
   });
+
+  await messageRepository.save(newMessage);
+
+  const receiverSocketId = onlineUsers.get(receiverId)?.socketIds;
+
+  if (receiverSocketId) {
+    console.log(`📤 Sending message to ${receiverId} at ${receiverSocketId}`);
+    io.to(receiverSocketId).emit("receiveMessage", {
+      id: newMessage.id,
+      senderId,
+      receiverId,
+      text,
+      timestamp: newMessage.timestamp,
+      is_read: newMessage.is_read,
+    });
+  } else {
+    console.log(`📥 Message saved for offline user: ${receiverId}`);
+  }
+});
+
+
+  socket.on("markAsRead", async ({ messageId } : any) => {
+    const messageRepository = AppDataSource.getRepository(Message);
+    await messageRepository.update({ id: messageId }, { is_read: true });
+  });
+
 });
 
 // Periodic check for inactivity (for automatic logout)
 setInterval(async () => {
-  for (const username in connectedUsers) {
-    console.log(`User ${username} interval ${clientTracker.getActiveClients()}`);
-    
-    const userConnections = connectedUsers[username]; // Array of connections
-    const userRepository = AppDataSource.getRepository(User);
+  console.log(`Checking for inactive users...`);
 
-    // Fetch user details from the database
-    const userobj:any = await userRepository.findOne({ where: { id: username } });
-    if (!userobj) {
-      console.log(`User ${username} not found in the database`);
-      continue;
-    }
+  const userRepository = AppDataSource.getRepository(User);
+  const now = Date.now();
 
-    const now = new Date().getTime(); // Current time in milliseconds
-    const lastActivityTime = new Date(userobj.lastActivity).getTime(); // Convert lastActivity to milliseconds
+  // Fetch all active users from database
+  const allUsers:any = await userRepository.find({
+    where: { id: In([...onlineUsers.keys()]) }, // Fetch only users currently online
+    select: ["id", "lastActivity"], // Fetch only necessary fields
+  });
+  console.log(allUsers,'allUsers')
+  for (const user of allUsers) {
+    const lastActivityTime = new Date(user?.lastActivity).getTime();
 
     if (now - lastActivityTime > INACTIVITY_TIMEOUT) {
-      // User has been inactive for more than the timeout threshold
-
-      userConnections.forEach((connection:any) => {
-        // Emit logout event to each socket
-        io.to(connection.socketId).emit("logout", {
+      // User is inactive
+      const userConnections = onlineUsers.get(user.id)?.socketIds || [];
+      console.log(userConnections,'userConnections2')
+      userConnections.forEach((socketId: string) => {
+        console.log(socketId,'socketId')
+        io.to(socketId).emit("logout", {
           message: "You have been logged out due to inactivity",
         });
-        console.log(
-          `User ${username} with socket ${connection.socketId} has been logged out due to inactivity`
-        );
+        console.log(`User ${user.id} (Socket: ${socketId}) logged out due to inactivity`);
       });
 
-      // Remove the user from connectedUsers
-      delete connectedUsers[username];
+      // Remove user from online users list
+      onlineUsers.delete(user.id);
+    
+      console.log(`User ${user.id} removed from onlineUsers.`);
     }
   }
-}, 60000); // Check every minute
 
-export {app, server, port,  io,}
+  // Broadcast updated online users list
+  io.emit("onlineUsers", Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username })));
+}, 60000); // Run every minute
+
+
+
+export { app, server, port, io, AppDataSource, };

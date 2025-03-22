@@ -43,10 +43,10 @@ const botService = new TelegramBotService('7911946633:AAGg6RoGaGhbMYO-cmbbJ8UC_6
       const userReq  = await userRepository.findOneBy({ id:userReqId });
 
       const users = await userRepository.find({
-        select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'createdDate'], // List the fields you want to include
+        select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'lastActivity' , 'createdDate'], // List the fields you want to include
       });
       const nonSuperusers = await userRepository.find({
-        select: ['id', 'name', 'email', 'isSuperUser','createdDate'], // List the fields you want to include
+        select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'lastActivity' , 'createdDate'], // List the fields you want to include
         where: {
           isSuperUser: false, 
         },
