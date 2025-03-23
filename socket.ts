@@ -19,10 +19,10 @@ import { Message } from './entity/chat';
 const clientTracker = require('./user/ClientTracker');  // Import the client tracker module
 const fs = require('fs');
 const INACTIVITY_TIMEOUT = 300000; // 5min
-// const server = https.createServer(options,app);
+
 const app: Application = express();
 const port = process.env.PORT;
-const server = http.createServer(app);
+
 // Set max headers size (in bytes, default is 8KB)
 const allowedOrigins:any = [
   process.env.REACT_APP_HMS, 
@@ -42,6 +42,8 @@ const options = {
   key: fs.readFileSync('cert/privkey.pem'),
   cert: fs.readFileSync('cert/fullchain.pem'),
 };
+// const server = https.createServer(options,app);
+const server = http.createServer(app);
 
 server.maxHeadersCount = 1000; // Maximum number of headers to allow
 server.maxRequestsPerSocket = 100;
