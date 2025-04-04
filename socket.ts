@@ -19,7 +19,8 @@ import { Message } from './entity/chat';
 const clientTracker = require('./user/ClientTracker');  // Import the client tracker module
 const { sendPushNotification,sendPushNotificationToAll } = require("./notification/notificationController");
 const fs = require('fs');
-const INACTIVITY_TIMEOUT = 300000; // 5min
+const INACTIVITY_TIMEOUT = 86400000 //24h 
+// 300000; // 5min
 const { v4: uuidv4 } = require('uuid');
 const app: Application = express();
 const port = process.env.PORT;
@@ -28,8 +29,7 @@ const port = process.env.PORT;
 const allowedOrigins:any = [
   process.env.REACT_APP_HMS, 
   "http://localhost:3000",
-  'http://myserver.local:3000',
-  'https//centoc.io',
+  // 'https//centoc.io',
 ];
 
 interface UserConnection {

@@ -25,6 +25,7 @@ const jwtoken: any = process?.env?.SKJWT
       delete user.password;
     
       res.json({ token, ...user });
+      
     } catch (error) {
       res.status(500).json({ message: 'Error logging in', error });
     }
