@@ -17,9 +17,10 @@ import refferalRouter from './Refferal/refferalApi';
 import { In } from 'typeorm';
 import { Message } from './entity/chat';
 const clientTracker = require('./user/ClientTracker');  // Import the client tracker module
+const { sendPushNotification,sendPushNotificationToAll } = require("./notification/notificationController");
 const fs = require('fs');
 const INACTIVITY_TIMEOUT = 300000; // 5min
-
+const { v4: uuidv4 } = require('uuid');
 const app: Application = express();
 const port = process.env.PORT;
 
@@ -42,8 +43,8 @@ const options = {
   key: fs.readFileSync('cert/privkey.pem'),
   cert: fs.readFileSync('cert/fullchain.pem'),
 };
-// const server = https.createServer(options,app);
-const server = http.createServer(app);
+const server = https.createServer(options,app);
+// const server = http.createServer(app);
 
 server.maxHeadersCount = 1000; // Maximum number of headers to allow
 server.maxRequestsPerSocket = 100;
@@ -82,6 +83,11 @@ server.setTimeout(60000); // Set the timeout to 60 seconds
 
 
 const onlineUsers = new Map();
+const userActivity = new Map(); // Maps userId to { socketId, currentChatId }
+const chatId = uuidv4();
+function generateChatId(userId1: any, userId2: any) {
+  return [userId1, userId2].sort().join('_');
+}
 
 io.on("connection", (socket: any) => {
   console.log(`New socket connection: ${socket.id}`);
@@ -148,6 +154,12 @@ io.on("connection", (socket: any) => {
     const userId = socket.userId;
   
     onlineUsers.delete(userId);
+    for (const [userId, userInfo] of userActivity.entries()) {
+      if (userInfo.socketId === socket.id) {
+        userActivity.delete(userId);
+        console.log(`❌ User ${userId} disconnected`);
+      }
+    }
   
     io.emit("onlineUsers", Array.from(onlineUsers, ([id, data]) => ({ userId: id, username: data.username })));
   });
@@ -160,8 +172,47 @@ io.on("connection", (socket: any) => {
     })));
   });
 
+  socket.on("joinChat", ({ userId, chatId }: any) => {
+    userActivity.set(userId, {
+      socketId: socket.id,
+      currentChatId: chatId,
+      isBackground: false, // Default as active
+    });
+  });
+  
+  socket.on("leaveChat", ({ userId }: any) => {
+    if (userActivity.has(userId)) {
+      userActivity.set(userId, {
+        ...userActivity.get(userId)!,
+        currentChatId: null,
+      });
+    }
+  });
+  
+  socket.on("userActive", ({ userId }: any) => {
+    if (userActivity.has(userId)) {
+      userActivity.set(userId, {
+        ...userActivity.get(userId)!,
+        isBackground: false,
+      });
+      console.log(`🟢 User ${userId} is active`);
+    }
+  });
+  
+  socket.on("userBackground", ({ userId }: any) => {
+    if (userActivity.has(userId)) {
+      userActivity.set(userId, {
+        ...userActivity.get(userId)!,
+        isBackground: true,
+      });
+      console.log(`🟡 User ${userId} is in background`);
+    }
+  });
+
+
 socket.on("sendMessage", async ({ senderId, receiverId, text }: any) => {
   const messageRepository = AppDataSource.getRepository(Message);
+
   const newMessage = messageRepository.create({
     sender_id: senderId,
     receiver_id: receiverId,
@@ -170,9 +221,17 @@ socket.on("sendMessage", async ({ senderId, receiverId, text }: any) => {
 
   await messageRepository.save(newMessage);
 
-  const receiverSocketId = onlineUsers.get(receiverId)?.socketIds;
+  const receiverSocketId = await onlineUsers.get(receiverId)?.socketIds;
+  const activity = userActivity.get(receiverId);
+
+
 
   if (receiverSocketId) {
+   
+    const user:any = await AppDataSource.getRepository(User).findOneBy({id : receiverId})
+    console.log('receiverId',receiverId,user.fcmtoken);
+    const senderuser:any = await AppDataSource.getRepository(User).findOneBy({id :senderId})
+    
     console.log(`📤 Sending message to ${receiverId} at ${receiverSocketId}`);
     io.to(receiverSocketId).emit("receiveMessage", {
       id: newMessage.id,
@@ -182,6 +241,17 @@ socket.on("sendMessage", async ({ senderId, receiverId, text }: any) => {
       timestamp: newMessage.timestamp,
       is_read: newMessage.is_read,
     });
+    const result:any = {
+      token : user.fcmtoken,
+      title : 'New message from '+senderuser.name,
+      body : text
+    }
+console.log(activity,'activity')
+    if (activity?.currentChatId == null) {
+      await sendPushNotification(result.token, result.title, result.body);
+    }
+   
+
   } else {
     console.log(`📥 Message saved for offline user: ${receiverId}`);
   }

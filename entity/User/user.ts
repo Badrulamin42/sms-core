@@ -33,6 +33,9 @@ export class User {
   @Column({ type: 'boolean' })
   isSuperUser!: boolean ; // Provide a default value
 
+  @Column({ type: 'boolean', default: false })
+  isVerified?: boolean ; // Provide a default value
+
   @CreateDateColumn({ type: 'timestamp' })
   createdDate?: Date;
 

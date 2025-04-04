@@ -20,9 +20,9 @@ const sendPushNotification = async (deviceToken: string, title: string, body: st
   //   notification: { title, body },
   //   token: deviceToken,
   // };
-
+console.log(deviceToken,title,body,'deviceToken')
   const message = {
-    to: deviceToken, // Device FCM Token
+    token: deviceToken, // Device FCM Token
     data: { // ✅ Only use `data`, NOT `notification`
       title,
       body,

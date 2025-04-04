@@ -33,7 +33,8 @@ AppDataSource.initialize()
     app.use('/api/refferal', refferalRouter);
     app.use('/api/notification', NotificationRouter);
     // Protected route with JWT authentication
-    app.use('/api/user', verifyToken, userRouter);
+    //  app.use('/api/user', verifyToken, userRouter);
+    app.use('/api/user', userRouter);
     app.use(userActivityUpdate)
     app.use('/api/cam', camRouter);
     app.use('/api/msg', msgrouter);

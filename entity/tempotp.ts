@@ -6,7 +6,10 @@ export class TempOtp {
   id!: string;
 
   @Column()
-  Telegramusername!: string; // Use this to identify the temporary user (e.g., email or phone number)
+  Telegramusername?: string; // Use this to identify the temporary user (e.g., email or phone number)
+
+  @Column()
+  Email?: string; // Use this to identify the temporary user (e.g., email or phone number)
 
   @Column()
   otp!: string; // The OTP sent to the user
