@@ -16,6 +16,7 @@ import NotificationRouter from './notification/notificationApi';
 import refferalRouter from './Refferal/refferalApi';
 import { app, port, server } from './socket';
 import msgrouter from './chat/chatAPI';
+import userVerifyRouter from './user/UserVerification';
 
 
 // Set body parser limits
@@ -38,7 +39,8 @@ AppDataSource.initialize()
     app.use(userActivityUpdate)
     app.use('/api/cam', camRouter);
     app.use('/api/msg', msgrouter);
-  
+    app.use('/api/userVerify',userVerifyRouter);
+
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);
     });

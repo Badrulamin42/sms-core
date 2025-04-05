@@ -14,6 +14,9 @@ export class TempOtp {
   @Column()
   otp!: string; // The OTP sent to the user
 
+  @Column({ default: false })
+  isExpired!: boolean;
+
   @Column({ type: 'bigint' })
   generatedAt!: number; // Timestamp when the OTP was generated
 }

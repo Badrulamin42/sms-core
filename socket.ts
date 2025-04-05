@@ -32,19 +32,13 @@ const allowedOrigins:any = [
   // 'https//centoc.io',
 ];
 
-interface UserConnection {
-  socketId: string;
-  lastActivity: number;
-}
-
-
 // Create a proxy server
 const options = {
   key: fs.readFileSync('cert/privkey.pem'),
   cert: fs.readFileSync('cert/fullchain.pem'),
 };
-const server = https.createServer(options,app);
-// const server = http.createServer(app);
+// const server = https.createServer(options,app);
+const server = http.createServer(app);
 
 server.maxHeadersCount = 1000; // Maximum number of headers to allow
 server.maxRequestsPerSocket = 100;
