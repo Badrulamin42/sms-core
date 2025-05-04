@@ -78,10 +78,6 @@ server.setTimeout(60000); // Set the timeout to 60 seconds
 
 const onlineUsers = new Map();
 const userActivity = new Map(); // Maps userId to { socketId, currentChatId }
-const chatId = uuidv4();
-function generateChatId(userId1: any, userId2: any) {
-  return [userId1, userId2].sort().join('_');
-}
 
 io.on("connection", (socket: any) => {
   console.log(`New socket connection: ${socket.id}`);

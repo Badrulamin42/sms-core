@@ -17,18 +17,19 @@ import refferalRouter from './Refferal/refferalApi';
 import { app, port, server } from './socket';
 import msgrouter from './chat/chatAPI';
 import userVerifyRouter from './user/UserVerification';
-
+import createProjectRouter from './project/projectApi';
+import path from 'path';
 
 // Set body parser limits
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 
-
+console.log('__dirname:', __dirname);
 AppDataSource.initialize()
   .then(() => {
     console.log('Data Source has been initialized.');
-
+    app.use('/uploads', express.static(path.join(__dirname, '../../hms/public/uploads')));
     // Public routes
     app.use('/api/auth', authRouter);
     app.use('/api/refferal', refferalRouter);
@@ -40,6 +41,8 @@ AppDataSource.initialize()
     app.use('/api/cam', camRouter);
     app.use('/api/msg', msgrouter);
     app.use('/api/userVerify',userVerifyRouter);
+    app.use('/api/project',createProjectRouter);
+
 
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);
