@@ -29,7 +29,7 @@ const port = process.env.PORT;
 const allowedOrigins:any = [
   process.env.REACT_APP_HMS, 
   "http://localhost:3000",
-  // 'https//centoc.io',
+  'https//centoc.io',
 ];
 
 // Create a proxy server
