@@ -3,13 +3,14 @@ import { AppDataSource } from '../config/ormconfig';
 import { Project } from '../entity/Project/project';
 import { saveImageToGallery } from '../service/galleryUploader';
 import { upload } from '../config/mutler'; // Assuming your multer config is in 'middleware/upload'
+import { ProjectUnit } from '../entity/Project/projectUnit';
 
 const projectRouter = Router();
 
 // Create project route with file upload
 projectRouter.post('/create', upload.array('image', 5), async (req: Request, res: Response) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, creator, status, propertyType, address } = req.body;
 
     // Check if required fields are present
     if (!name) {
@@ -22,6 +23,10 @@ projectRouter.post('/create', upload.array('image', 5), async (req: Request, res
     const newProject = projectRepo.create({
       name,
       description,
+      creator,
+      status,
+      propertyType,
+      address
     });
 
     // Save the project
@@ -53,18 +58,15 @@ projectRouter.post('/create', upload.array('image', 5), async (req: Request, res
   }
 });
 
-// Define route to fetch users
+// project lists
 projectRouter.get('/list', async (req, res) => {
   try {
-    const projectReqId: any = req.query.ID;
     const projectRepository = AppDataSource.getRepository(Project);
-    const projectReq = await projectRepository.findOneBy({ id: projectReqId });
 
     const projects = await projectRepository.find({
-      select: ['id', 'name', 'description', 'createdAt'], // `galleries` must not be here
+      select: ['id', 'name', 'description', 'createdAt', 'creator', 'propertyType', 'status'], // `galleries` must not be here
       relations: ['galleries'], // This tells TypeORM to load the galleries relation
     });
-
 
     res.json( projects );
   } catch (error) {
@@ -72,6 +74,30 @@ projectRouter.get('/list', async (req, res) => {
     res.status(500).send('Database query error');
   }
 });
+
+// project detail
+projectRouter.get('/details', async (req, res) => {
+  try {
+    const projectReqId: any = req.query.ID;
+    const projectUnitRepository = AppDataSource.getRepository(ProjectUnit);
+    const projectUnit = await projectUnitRepository.findOneBy({ id: projectReqId });
+
+    if (!projectUnit) {
+      return res.status(404).json({ success: false, message: 'Project not found' });
+    }
+
+    res.json( 
+      {
+        success: true,
+        data: projectUnit,
+      }
+     );
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    res.status(500).send('Database query error');
+  }
+});
+
 
 
 export default projectRouter;

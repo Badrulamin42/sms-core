@@ -19,6 +19,7 @@ import msgrouter from './chat/chatAPI';
 import userVerifyRouter from './user/UserVerification';
 import createProjectRouter from './project/projectApi';
 import path from 'path';
+import roleRouter from './Role/roleApi';
 
 // Set body parser limits
 app.use(express.json({ limit: '50mb' }));
@@ -42,7 +43,7 @@ AppDataSource.initialize()
     app.use('/api/msg', msgrouter);
     app.use('/api/userVerify',userVerifyRouter);
     app.use('/api/project',createProjectRouter);
-
+    app.use('/roles', roleRouter);  
 
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);
