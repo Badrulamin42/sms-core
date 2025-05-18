@@ -8,6 +8,7 @@ import { TelegramBotService } from '../telegram/cam_notification';
 import { TempOtp } from '../entity/tempotp';
 import { Referral } from '../entity/Referral/Refferal';
 import multer from 'multer';
+import { Role } from '../entity/User/roles';
 const sendEmail = require("../service/mailer");
 
 const { nanoid } = require('nanoid');
@@ -40,10 +41,10 @@ userRouter.get('/list', async (req, res) => {
     const userReq = await userRepository.findOneBy({ id: userReqId });
 
     const users = await userRepository.find({
-      select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'lastActivity', 'createdDate'], // List the fields you want to include
+      select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'lastActivity', 'createdDate', 'phoneNumber', 'role', 'jobTitle'], // List the fields you want to include
     });
     const nonSuperusers = await userRepository.find({
-      select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'lastActivity', 'createdDate'], // List the fields you want to include
+      select: ['id', 'name', 'email', 'isSuperUser', 'referralCode', 'lastActivity', 'createdDate', 'phoneNumber', 'role', 'jobTitle'], // List the fields you want to include
       where: {
         isSuperUser: false,
       },
@@ -62,11 +63,13 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 userRouter.post('/register', upload.single("image"), async (req, res) => {
-  const { email, password, name, isSuperUser, actionBy, telegram, chatId, ref, phoneNumber } = req.body;
+  const { email, password, name, isSuperUser, actionBy, telegram, chatId, ref, phoneNumber, roleId, jobTitle } = req.body;
   const image = req.file ? req.file.buffer : null; // Store image as binary
 
   const userRepository = AppDataSource.getRepository(User);
   const referrerRepository = AppDataSource.getRepository(Referral);
+  const roleRepository = AppDataSource.getRepository(Role);
+
   // Input validation (basic example)
   if (!email || !password || !name) {
     return res.status(400).json({ message: 'Email, password, and name are required', result: 'failed' });
@@ -86,7 +89,7 @@ userRouter.post('/register', upload.single("image"), async (req, res) => {
     // Create new user
     const user = new User();
     user.email = email;
-    
+
     user.name = name;
     user.isSuperUser = isSuperUser;
     user.phoneNumber = phoneNumber
@@ -94,7 +97,19 @@ userRouter.post('/register', upload.single("image"), async (req, res) => {
     user.chatID = chatId === "" ? null : chatId
     user.image = image ? image : undefined;
     user.referralCode = await generateUniqueReferralCode(name); // Or use user.id if available
+    user.jobTitle = jobTitle
 
+    // Handle role assignment (optional)
+    if (roleId) {
+      const role = await roleRepository.findOneBy({ id: roleId });
+      if (!role) {
+        return res.status(400).json({ success: false, message: 'Invalid role ID' });
+      }
+      user.role = role;
+    } else if (roleId === null) {
+      // Unassign role if explicitly passed as null
+      user.role = null;
+    }
 
 
     // Hash password before saving (assuming setPassword hashes the password)
@@ -116,6 +131,7 @@ userRouter.post('/register', upload.single("image"), async (req, res) => {
       }
     }
 
+
     await createLog("CREATE", "User", { email, name, isSuperUser, telegram }, actionBy);
     res.status(201).json({ message: 'User registered successfully', result: 'true' });
   } catch (error) {
@@ -126,13 +142,11 @@ userRouter.post('/register', upload.single("image"), async (req, res) => {
 
 
 
-
-//UPDATE user by ID
+//update
 userRouter.put('/update', async (req, res) => {
   try {
-    const { id, name, email, isSuperUser } = req.body;
+    const { id, name, email, isSuperUser, roleId, jobTitle, phoneNumber } = req.body;
 
-    // Validate input
     if (!id) {
       return res.status(400).json({
         success: false,
@@ -141,9 +155,12 @@ userRouter.put('/update', async (req, res) => {
     }
 
     const userRepository = AppDataSource.getRepository(User);
+    const roleRepository = AppDataSource.getRepository(Role);
 
-    // Find the user to update
-    const user = await userRepository.findOneBy({ id });
+    const user = await userRepository.findOne({
+      where: { id },
+      relations: ['role'], // if needed
+    });
 
     if (!user) {
       return res.status(404).json({
@@ -152,12 +169,23 @@ userRouter.put('/update', async (req, res) => {
       });
     }
 
-    // Update user fields if provided
     if (name) user.name = name;
     if (email) user.email = email;
     if (isSuperUser !== undefined) user.isSuperUser = isSuperUser;
+    if (jobTitle) user.jobTitle = jobTitle;
+    if (phoneNumber) user.phoneNumber = phoneNumber;
+    // Handle role assignment (optional)
+    if (roleId) {
+      const role = await roleRepository.findOneBy({ id: roleId });
+      if (!role) {
+        return res.status(400).json({ success: false, message: 'Invalid role ID' });
+      }
+      user.role = role;
+    } else if (roleId === null) {
+      // Unassign role if explicitly passed as null
+      user.role = null;
+    }
 
-    // Save the updated user
     await userRepository.save(user);
 
     return res.status(200).json({
@@ -173,6 +201,7 @@ userRouter.put('/update', async (req, res) => {
     });
   }
 });
+
 
 //delete
 // DELETE user by ID

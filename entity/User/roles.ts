@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToMany } from 'typeorm';
 import { User } from './user';
+import { Permission } from './permission';
 
 @Entity()
 export class Role {
@@ -9,6 +10,10 @@ export class Role {
   @Column({ unique: true })
   name!: string; // Example: "admin", "editor", "user"
 
-  @ManyToMany(() => User, (user) => user.roles)
-  users!: User[];
+  @OneToMany(() => User, (user) => user.role)
+  users!: Promise<User[]>;
+
+  @ManyToMany(() => Permission, (permission) => permission.roles, { cascade: true })
+  @JoinTable()
+  permissions!: Permission[];
 }
