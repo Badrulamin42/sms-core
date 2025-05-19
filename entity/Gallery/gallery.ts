@@ -22,5 +22,5 @@ export class Gallery {
 
   @ManyToOne(() => ProjectUnit, (projectUnit) => projectUnit.galleries, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'projectUnitId' })
-  projectUnit?: Project; // Nullable if the gallery is not associated with a project
+  projectUnit?: ProjectUnit; // Nullable if the gallery is not associated with a project
 }

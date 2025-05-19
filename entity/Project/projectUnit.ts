@@ -8,7 +8,10 @@ export class ProjectUnit {
     id!: string;
 
     @Column()
-    unitType!: string; // Name of the project
+    unitName!: string; // Name of the project
+
+    @Column()
+    description?: string; // Name of the project
 
     @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt!: Date; // Timestamp when the project was created
@@ -23,13 +26,13 @@ export class ProjectUnit {
     creator!: string; // Username, email, or user ID of the person who last modified this project
 
     @Column()
-    squareFeet!: string; //  300 x 200
+    squareFeet?: string; //  300 x 200
 
     @Column()
-    totalDimension!: string; // feet / 800
+    totalDimension?: string; // feet / 800
 
     @Column()
-    builtDimentsion!: string; // feet 800
+    builtDimension?: string; // feet 800
 
     @Column()
     price!: string; // RM
@@ -40,8 +43,13 @@ export class ProjectUnit {
     @Column()
     landTitle?: string; // bumi lot,non-bumi,malay reserve, 
 
+    @Column()
+    bed?: number; // 123
 
-    @OneToMany(() => Gallery, (gallery) => gallery.project)
+    @Column()
+    bath?: number; // 123
+
+    @OneToMany(() => Gallery, (gallery) => gallery.projectUnit)
     galleries!: Gallery[];
 
     @ManyToOne(() => Project, (project) => project.projectUnits, { onDelete: 'CASCADE', nullable: true })

@@ -1,34 +1,50 @@
 import { AppDataSource } from '../config/ormconfig';
 import { Gallery } from '../entity/Gallery/gallery';
-import { Project } from '../entity/Project/project';
-import { Request } from 'express'; // Importing Request type from Express
+import { Request } from 'express';
+import { ObjectLiteral, Repository } from 'typeorm';
 
-export const saveImageToGallery = async (
-  file: Express.Multer.File, 
-  projectId: string, 
-  req: Request // Ensure 'req' is correctly typed as Express.Request
-): Promise<Gallery> => {
-  const projectRepo = AppDataSource.getRepository(Project);
+type SaveGalleryOptions = {
+  file: Express.Multer.File;
+  entityId: string;
+  entityType: 'project' | 'projectUnit' | 'user'; // Extend this as needed
+  req: Request;
+};
+
+export const saveImageToEntityGallery = async ({
+  file,
+  entityId,
+  entityType,
+  req,
+}: SaveGalleryOptions): Promise<Gallery> => {
   const galleryRepo = AppDataSource.getRepository(Gallery);
 
-  // Construct the URL of the uploaded image
-  const url = `/uploads/${file.filename}`;
-  
-  const fullUrl = `${process.env.REACT_APP_HMS_DEV + '/uploads/' + file.filename}`;
+  // Dynamically choose the entity repo
+  let entityRepo: Repository<ObjectLiteral>;
+  let relationKey: keyof Gallery;
 
-  // Find the project to associate with the image
-  const project = await projectRepo.findOne({ where: { id: projectId } });
-  if (!project) {
-    throw new Error('Project not found');
+  switch (entityType) {
+    case 'project':
+      entityRepo = AppDataSource.getRepository(require('../entity/Project/project').Project);
+      relationKey = 'project';
+      break;
+    case 'projectUnit':
+      entityRepo = AppDataSource.getRepository(require('../entity/Project/projectUnit').ProjectUnit);
+      relationKey = 'projectUnit';
+      break;
+    default:
+      throw new Error('Unsupported entity type for gallery association');
   }
 
-  // Create a new Gallery entry and associate it with the project
+  const entity = await entityRepo.findOne({ where: { id: entityId } });
+  if (!entity) throw new Error(`${entityType} not found`);
+
+  const imageUrl = `${process.env.REACT_APP_HMS_DEV}/uploads/${file.filename}`;
+
   const gallery = galleryRepo.create({
-    imageUrl: fullUrl,
-    project: project, // Associate with project
-    uploadedAt: new Date(), // Explicitly set uploadedAt timestamp
+    imageUrl,
+    [relationKey]: entity,
+    uploadedAt: new Date(),
   });
 
-  // Save and return the gallery entry
   return await galleryRepo.save(gallery);
 };

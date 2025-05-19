@@ -21,6 +21,7 @@ import createProjectRouter from './project/projectApi';
 import path from 'path';
 import roleRouter from './Role/roleApi';
 import permRouter from './Permission/permissionApi';
+import projectUnitRouter from './project/projectUnitApi';
 
 // Set body parser limits
 app.use(express.json({ limit: '50mb' }));
@@ -46,6 +47,7 @@ AppDataSource.initialize()
     app.use('/api/project',createProjectRouter);
     app.use('/api/roles', roleRouter);  
     app.use('/api/permissions', permRouter);
+    app.use('/api/projectUnit', projectUnitRouter);
 
     server.listen(port, () => {
       console.log(`Server running at ${process.env.DB_HOST}:${port}`);

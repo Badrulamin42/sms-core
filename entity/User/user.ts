@@ -42,6 +42,15 @@ export class User {
   @CreateDateColumn({ type: 'timestamp' })
   createdDate?: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  updatedAt?: Date; // Timestamp when the project was last updated
+
+  @Column({ nullable: true })
+  modifier?: string; // Username, email, or user ID of the person who last modified this project
+
+  @Column()
+  creator!: string; // Username, email, or user ID of the person who last modified this project
+
   @Column({ unique: true, nullable: true })
   phoneNumber?: string; // Add phone number field
 

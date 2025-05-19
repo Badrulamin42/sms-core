@@ -1,7 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { AppDataSource } from '../config/ormconfig';
 import { Project } from '../entity/Project/project';
-import { saveImageToGallery } from '../service/galleryUploader';
+import { saveImageToEntityGallery } from '../service/galleryUploader';
 import { upload } from '../config/mutler'; // Assuming your multer config is in 'middleware/upload'
 import { ProjectUnit } from '../entity/Project/projectUnit';
 
@@ -36,7 +36,12 @@ projectRouter.post('/create', upload.array('image', 5), async (req: Request, res
     if (req.files && Array.isArray(req.files)) {
       // Use the saveImageToGallery service to save images
       const galleryPromises = (req.files as Express.Multer.File[]).map(file =>
-        saveImageToGallery(file, savedProject.id, req) // Save image and associate with the project
+        saveImageToEntityGallery({
+                file,
+                entityId: savedProject.id,
+                entityType: 'project',
+                req,
+            })
       );
 
       await Promise.all(galleryPromises); // Wait for all gallery images to be saved
@@ -68,7 +73,7 @@ projectRouter.get('/list', async (req, res) => {
       relations: ['galleries'], // This tells TypeORM to load the galleries relation
     });
 
-    res.json( projects );
+    res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).send('Database query error');
@@ -80,18 +85,22 @@ projectRouter.get('/details', async (req, res) => {
   try {
     const projectReqId: any = req.query.ID;
     const projectUnitRepository = AppDataSource.getRepository(ProjectUnit);
-    const projectUnit = await projectUnitRepository.findOneBy({ id: projectReqId });
+    const projectUnits = await projectUnitRepository.find({
+      where: { project: { id: projectReqId } },
+      relations: ['galleries'],
+    });
 
-    if (!projectUnit) {
-      return res.status(404).json({ success: false, message: 'Project not found' });
+
+    if (!projectUnits) {
+      return res.status(404).json({ success: false, message: 'Project Units not found' });
     }
 
-    res.json( 
+    res.json(
       {
         success: true,
-        data: projectUnit,
+        data: projectUnits,
       }
-     );
+    );
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).send('Database query error');

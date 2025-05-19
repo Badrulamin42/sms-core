@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } from 'typeorm';
 import { Gallery } from '../Gallery/gallery';
 import { ProjectUnit } from './projectUnit';
 
@@ -16,7 +16,7 @@ export class Project {
   @Column({ nullable: true })
   address?: string; // Optional project description
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date; // Timestamp when the project was created
 
   @Column({ type: 'timestamp', nullable: true })

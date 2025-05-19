@@ -28,6 +28,7 @@ const port = process.env.PORT;
 // Set max headers size (in bytes, default is 8KB)
 const allowedOrigins:any = [
   process.env.REACT_APP_HMS, 
+  "http://192.168.0.193:3000",
   "http://localhost:3000",
   'https//centoc.io',
 ];
